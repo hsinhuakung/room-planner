@@ -1185,7 +1185,7 @@ export default function RoomPlannerPro() {
           </div>
         )}
 
-        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-4 gap-3">
           <StatCard
             title="總名單"
             value={totals.people}
