@@ -1,73 +1,237 @@
-# React + TypeScript + Vite
+# Room Planner Pro
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+一個 **教會 / 活動 / 旅遊住宿排房系統**，可快速安排人員、房間與床位。
 
-Currently, two official plugins are available:
+支援：
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- 拖拉排房
+- 一鍵自動分房
+- 家庭優先分房
+- 男女分房
+- 多飯店管理
+- Excel / CSV 匯入
+- Excel / PDF 匯出
+- 本機資料保存
 
-## React Compiler
+適合用於：
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- 教會退修會
+- 夏令營
+- 旅行團
+- 學校活動
+- 團體住宿安排
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+# 系統畫面
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+- 未安排名單
+- 房間 / 床位配置
+- 自動分房
+- 手機友善選人
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+支援拖拉與手機操作。
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+---
+
+# 功能
+
+## 1 人員管理
+
+支援四種身分：
+
+|身分|是否佔床|
+|---|---|
+|成人|是|
+|學生|是|
+|孩童|否|
+|幼兒|否|
+
+每個人可設定：
+
+- 姓名
+- 身分
+- 性別
+- 家庭群組
+- 備註
+
+---
+
+## 2 房間管理
+
+每個房間可以設定：
+
+- 飯店
+- 房名
+- 床位數
+- 房間性別
+- 樓層
+- 備註
+
+房間可設定：
+
+- auto
+- male
+- female
+- mixed
+
+---
+
+## 3 多飯店管理
+
+系統支援多個飯店，例如：
+
+- 和平飯店
+- 恩典旅店
+
+
+每個飯店會用不同顏色顯示。
+
+---
+
+## 4 排房方式
+
+### 拖拉排房
+
+直接拖拉人員到：
+
+- 房間
+- 床位
+
+---
+
+### 手機排房
+
+每個床位有 **選人按鈕**
+
+點擊即可選擇未安排名單。
+
+---
+
+### 自動分房
+
+一鍵自動分房功能會考慮：
+
+- 床位數
+- 家庭群組
+- 性別
+- 房間性別限制
+
+---
+
+## 5 Excel 匯入
+
+支援匯入：
+
+- 人員
+- 房間
+
+### 人員格式
+
+|姓名|身分|家庭/群組|性別|備註|
+|---|---|---|---|---|
+|王大明|成人|王家|男||
+|王小華|學生|王家|女|學生佔床|
+|王小寶|孩童|王家|男|不佔床|
+
+---
+
+### 房間格式
+
+|飯店名稱|房間名稱|床位數|房間性別|樓層|備註|
+|---|---|---|---|---|---|
+|和平飯店|101房|2|auto|1||
+|和平飯店|102房|4|auto|1||
+|恩典旅店|201房|3|auto|2||
+
+---
+
+## 6 匯出功能
+
+可以匯出：
+
+### Excel
+
+包含：
+
+- 排房結果
+- 房間摘要
+
+### PDF
+
+可列印報表。
+
+---
+
+## 7 本機資料保存
+
+系統會自動儲存資料到：
+
+- localStorage
+
+
+關閉瀏覽器後仍可保留資料。
+
+---
+
+# 技術架構
+
+前端技術：
+
+- React
+- TypeScript
+- Vite
+- TailwindCSS
+- Shadcn UI
+- Framer Motion
+
+
+資料處理：
+
+- xlsx
+- jsPDF
+
+---
+
+# 安裝方式
+
+先安裝 Node.js
+
+https://nodejs.org/
+
+然後執行：
+
+```bash
+git clone https://github.com/YOUR_GITHUB_USERNAME/room-planner.git
+
+cd room-planner
+
+npm install
+
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+啟動開發環境：
+```bash
+npm run dev
+```
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+打開：
+```bash
+http://localhost:5173
+```
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+---
+
+# Build
+
+打包：
+
+```bash
+npm run build
+```
+
+輸出：
+
+```bash
+dist/
 ```
