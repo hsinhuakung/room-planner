@@ -195,7 +195,7 @@ type DragData = {
   personId: string;
 };
 
-type ImportMode = "people" | "rooms";
+type ImportMode = "people" | "rooms" | "bundle";
 
 type AddPersonForm = {
   name: string;
@@ -516,6 +516,21 @@ function parsePeopleSheet(rows: Record<string, unknown>[]): Person[] {
     .filter((person): person is Person => Boolean(person));
 }
 
+function parseHotelsSheet(rows: Record<string, unknown>[]): Hotel[] {
+  return rows
+    .map((row, index) => {
+      const name =
+        row["飯店名稱"] || row["hotel"] || row["Hotel"] || `飯店${index + 1}`;
+      if (!String(name).trim()) return null;
+      return {
+        id: String(row["飯店編號"] || row["id"] || uid("H")),
+        name: String(name).trim(),
+        note: String(row["備註"] || row["note"] || "").trim(),
+      };
+    })
+    .filter((hotel): hotel is Hotel => Boolean(hotel));
+}
+
 function parseRoomsSheet(
   rows: Record<string, unknown>[],
   hotels: Hotel[],
@@ -725,6 +740,8 @@ export default function RoomPlannerPro() {
   });
   const peopleFileRef = useRef<HTMLInputElement | null>(null);
   const roomsFileRef = useRef<HTMLInputElement | null>(null);
+  const hotelsFileRef = useRef<HTMLInputElement | null>(null);
+  const bundleFileRef = useRef<HTMLInputElement | null>(null);
 
   const hotels = store.hotels;
   const people = store.people;
@@ -904,6 +921,59 @@ export default function RoomPlannerPro() {
   async function importWorkbook(file: File, mode: ImportMode): Promise<void> {
     const data = await file.arrayBuffer();
     const wb = XLSX.read(data);
+
+    if (mode === "bundle") {
+      const hotelSheetName = wb.SheetNames.find((name) =>
+        /飯店|hotel/i.test(name),
+      );
+      const peopleSheetName = wb.SheetNames.find((name) =>
+        /人員|名單|people/i.test(name),
+      );
+      const roomSheetName = wb.SheetNames.find((name) =>
+        /房間|rooms?/i.test(name),
+      );
+
+      const parsedHotels = hotelSheetName
+        ? parseHotelsSheet(
+            XLSX.utils.sheet_to_json(wb.Sheets[hotelSheetName], {
+              defval: "",
+            }) as Record<string, unknown>[],
+          )
+        : [];
+      const nextHotels = parsedHotels.length ? parsedHotels : hotels;
+
+      const parsedPeople = peopleSheetName
+        ? parsePeopleSheet(
+            XLSX.utils.sheet_to_json(wb.Sheets[peopleSheetName], {
+              defval: "",
+            }) as Record<string, unknown>[],
+          )
+        : [];
+      const parsedRooms = roomSheetName
+        ? parseRoomsSheet(
+            XLSX.utils.sheet_to_json(wb.Sheets[roomSheetName], {
+              defval: "",
+            }) as Record<string, unknown>[],
+            nextHotels,
+          )
+        : [];
+
+      if (!parsedHotels.length && !parsedPeople.length && !parsedRooms.length) {
+        setMessage(
+          "找不到可匯入的飯店 / 人員 / 房間工作表，請確認工作表名稱包含：飯店、人員、房間",
+        );
+        return;
+      }
+
+      if (parsedHotels.length) setHotels(parsedHotels);
+      if (parsedPeople.length) setPeople(parsedPeople);
+      if (parsedRooms.length) setRooms(parsedRooms);
+      setMessage(
+        `已匯入整包資料：飯店 ${parsedHotels.length} 筆 / 人員 ${parsedPeople.length} 筆 / 房間 ${parsedRooms.length} 筆`,
+      );
+      return;
+    }
+
     const firstSheet = wb.Sheets[wb.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(firstSheet, { defval: "" }) as Record<
       string,
@@ -919,6 +989,7 @@ export default function RoomPlannerPro() {
       }
       setPeople(parsed);
       setMessage(`已匯入 ${parsed.length} 筆人員資料`);
+      return;
     }
     if (mode === "rooms") {
       const parsed = parseRoomsSheet(rows, hotels);
@@ -1574,6 +1645,35 @@ export default function RoomPlannerPro() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <Card className="rounded-2xl shadow-sm">
                 <CardHeader>
+                  <CardTitle>整包匯入 Excel</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <input
+                    ref={bundleFileRef}
+                    type="file"
+                    accept=".xlsx,.xls"
+                    className="hidden"
+                    onChange={(e) =>
+                      e.target.files?.[0] &&
+                      importWorkbook(e.target.files[0], "bundle")
+                    }
+                  />
+                  <Button
+                    className="rounded-2xl w-full"
+                    onClick={() => bundleFileRef.current?.click()}
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    匯入飯店 + 人員 + 房間
+                  </Button>
+                  <div className="text-sm text-slate-600 leading-6">
+                    可一次匯入同一份 Excel
+                    內的「飯店範本」、「人員範本」、「房間範本」三個工作表。
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-2xl shadow-sm">
+                <CardHeader>
                   <CardTitle>匯入人員 Excel / CSV</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
@@ -1623,13 +1723,56 @@ export default function RoomPlannerPro() {
                     選擇房間檔案
                   </Button>
                   <div className="text-sm text-slate-600 leading-6">
-                    支援欄位：飯店名稱、房間名稱、床位數、房間性別、樓層、備註。
+                    支援欄位：飯店名稱、房間名稱、床位數、房間性別、樓層、備註。若飯店名稱不存在，會優先套用目前第一間飯店。
                   </div>
                 </CardContent>
               </Card>
-            </div>
+              
+              <Card className="rounded-2xl shadow-sm">
+                <CardHeader>
+                  <CardTitle>匯入飯店 Excel / CSV</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <input
+                    ref={hotelsFileRef}
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      file.arrayBuffer().then((data) => {
+                        const wb = XLSX.read(data);
+                        const rows = XLSX.utils.sheet_to_json(
+                          wb.Sheets[wb.SheetNames[0]],
+                          { defval: "" },
+                        ) as Record<string, unknown>[];
+                        const parsed = parseHotelsSheet(rows);
+                        if (!parsed.length) {
+                          setMessage(
+                            "找不到可匯入的飯店資料，請確認欄位：飯店名稱、備註",
+                          );
+                          return;
+                        }
+                        setHotels(parsed);
+                        setNewRoomHotelId(parsed[0]?.id || "");
+                        setMessage(`已匯入 ${parsed.length} 筆飯店資料`);
+                      });
+                    }}
+                  />
+                  <Button
+                    className="rounded-2xl w-full"
+                    onClick={() => hotelsFileRef.current?.click()}
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    選擇飯店檔案
+                  </Button>
+                  <div className="text-sm text-slate-600 leading-6">
+                    支援欄位：飯店名稱、備註。
+                  </div>
+                </CardContent>
+              </Card>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <Card className="rounded-2xl shadow-sm">
                 <CardHeader>
                   <CardTitle>匯出結果</CardTitle>
