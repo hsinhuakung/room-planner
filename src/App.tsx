@@ -4,18 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { motion } from "framer-motion";
 import {
@@ -47,16 +42,8 @@ import jsPDF from "jspdf";
 const STORAGE_KEY = "room-bed-planner-v3";
 
 const TYPE_META = {
-  adult: {
-    label: "成人",
-    needsBed: true,
-    badge: "bg-slate-100 text-slate-800",
-  },
-  child: {
-    label: "孩童",
-    needsBed: false,
-    badge: "bg-amber-100 text-amber-800",
-  },
+  adult: { label: "成人", needsBed: true, badge: "bg-slate-100 text-slate-800" },
+  child: { label: "孩童", needsBed: false, badge: "bg-amber-100 text-amber-800" },
   infant: { label: "幼兒", needsBed: false, badge: "bg-sky-100 text-sky-800" },
 };
 
@@ -68,86 +55,16 @@ const GENDER_META = {
 };
 
 const defaultPeople = [
-  {
-    id: "P001",
-    name: "王大明",
-    type: "adult",
-    family: "王家",
-    gender: "male",
-    note: "",
-  },
-  {
-    id: "P002",
-    name: "王小美",
-    type: "adult",
-    family: "王家",
-    gender: "female",
-    note: "夫妻",
-  },
-  {
-    id: "P003",
-    name: "王小寶",
-    type: "child",
-    family: "王家",
-    gender: "male",
-    note: "孩童不佔床",
-  },
-  {
-    id: "P004",
-    name: "陳志宏",
-    type: "adult",
-    family: "陳家",
-    gender: "male",
-    note: "",
-  },
-  {
-    id: "P005",
-    name: "陳小柔",
-    type: "child",
-    family: "陳家",
-    gender: "female",
-    note: "孩童不佔床",
-  },
-  {
-    id: "P006",
-    name: "林淑芬",
-    type: "adult",
-    family: "林家",
-    gender: "female",
-    note: "",
-  },
-  {
-    id: "P007",
-    name: "郭建國",
-    type: "adult",
-    family: "郭家",
-    gender: "male",
-    note: "",
-  },
-  {
-    id: "P008",
-    name: "郭小安",
-    type: "infant",
-    family: "郭家",
-    gender: "unknown",
-    note: "幼兒不佔床",
-  },
-  {
-    id: "P009",
-    name: "黃慧婷",
-    type: "adult",
-    family: "黃家",
-    gender: "female",
-    note: "",
-  },
-  {
-    id: "P010",
-    name: "黃小翔",
-    type: "child",
-    family: "黃家",
-    gender: "male",
-    note: "孩童不佔床",
-  },
+  { id: "P001", name: "王大明", type: "adult", family: "王家", gender: "male", note: "" },
+  { id: "P002", name: "王小美", type: "adult", family: "王家", gender: "female", note: "夫妻" },
+  { id: "P003", name: "王小寶", type: "child", family: "王家", gender: "male", note: "孩童不佔床" },
+  { id: "P004", name: "陳志宏", type: "adult", family: "陳家", gender: "male", note: "" },
+  { id: "P005", name: "陳小柔", type: "child", family: "陳家", gender: "female", note: "孩童不佔床" },
+  { id: "P006", name: "林淑芬", type: "adult", family: "林家", gender: "female", note: "" },
+  { id: "P007", name: "郭建國", type: "adult", family: "郭家", gender: "male", note: "" },
+  { id: "P008", name: "郭小安", type: "infant", family: "郭家", gender: "unknown", note: "幼兒不佔床" },
+  { id: "P009", name: "黃慧婷", type: "adult", family: "黃家", gender: "female", note: "" },
+  { id: "P010", name: "黃小翔", type: "child", family: "黃家", gender: "male", note: "孩童不佔床" },
 ];
 
 const defaultRooms = [
@@ -158,10 +75,7 @@ const defaultRooms = [
 ];
 
 function buildRoom(id, name, bedCount) {
-  const beds = Array.from({ length: bedCount }, (_, i) => ({
-    id: `${id}-B${i + 1}`,
-    label: `${name}-${i + 1}`,
-  }));
+  const beds = Array.from({ length: bedCount }, (_, i) => ({ id: `${id}-B${i + 1}`, label: `${name}-${i + 1}` }));
   return {
     id,
     name,
@@ -179,9 +93,7 @@ function uid(prefix = "ID") {
 }
 
 function normalizeType(value) {
-  const v = String(value || "")
-    .trim()
-    .toLowerCase();
+  const v = String(value || "").trim().toLowerCase();
   if (["成人", "大人", "adult", "a"].includes(v)) return "adult";
   if (["孩童", "兒童", "child", "c"].includes(v)) return "child";
   if (["幼兒", "嬰兒", "infant", "baby", "i"].includes(v)) return "infant";
@@ -189,9 +101,7 @@ function normalizeType(value) {
 }
 
 function normalizeGender(value) {
-  const v = String(value || "")
-    .trim()
-    .toLowerCase();
+  const v = String(value || "").trim().toLowerCase();
   if (["男", "male", "m", "boy"].includes(v)) return "male";
   if (["女", "female", "f", "girl"].includes(v)) return "female";
   if (["其他", "other", "x"].includes(v)) return "other";
@@ -211,12 +121,7 @@ function bedNeedCount(memberObjects) {
 }
 
 function adultGenderSet(memberObjects) {
-  return new Set(
-    memberObjects
-      .filter((p) => p.type === "adult")
-      .map((p) => p.gender)
-      .filter((g) => g !== "unknown" && g !== "other"),
-  );
+  return new Set(memberObjects.filter((p) => p.type === "adult").map((p) => p.gender).filter((g) => g !== "unknown" && g !== "other"));
 }
 
 function inferRoomGender(room, people) {
@@ -229,9 +134,7 @@ function inferRoomGender(room, people) {
 
 function roomStats(room, people) {
   const memberObjects = membersOfRoom(room, people);
-  const assignedBeds = Object.values(room.bedAssignments).filter(
-    Boolean,
-  ).length;
+  const assignedBeds = Object.values(room.bedAssignments).filter(Boolean).length;
   const needBeds = bedNeedCount(memberObjects);
   return {
     members: memberObjects,
@@ -263,24 +166,16 @@ function fillBedsSequentially(room, people) {
   Object.keys(assignments).forEach((bedId) => {
     const pid = assignments[bedId];
     const person = personById(people, pid);
-    if (
-      !person ||
-      !TYPE_META[person.type]?.needsBed ||
-      !room.members.includes(pid)
-    )
-      assignments[bedId] = null;
+    if (!person || !TYPE_META[person.type]?.needsBed || !room.members.includes(pid)) assignments[bedId] = null;
   });
 
   const currentlyAssigned = new Set(Object.values(assignments).filter(Boolean));
   const needBedPeople = room.members
     .map((id) => personById(people, id))
-    .filter(
-      (p) => p && TYPE_META[p.type]?.needsBed && !currentlyAssigned.has(p.id),
-    );
+    .filter((p) => p && TYPE_META[p.type]?.needsBed && !currentlyAssigned.has(p.id));
 
   room.beds.forEach((bed) => {
-    if (!assignments[bed.id] && needBedPeople.length)
-      assignments[bed.id] = needBedPeople.shift().id;
+    if (!assignments[bed.id] && needBedPeople.length) assignments[bed.id] = needBedPeople.shift().id;
   });
 
   return { ...room, bedAssignments: assignments };
@@ -291,10 +186,7 @@ function exportRows(people, rooms) {
   rooms.forEach((room) => {
     room.members.forEach((id) => {
       const bed = room.beds.find((b) => room.bedAssignments[b.id] === id);
-      roomMap.set(id, {
-        roomName: room.name,
-        bedLabel: bed?.label || "不佔床 / 未指定",
-      });
+      roomMap.set(id, { roomName: room.name, bedLabel: bed?.label || "不佔床 / 未指定" });
     });
   });
   return people.map((p) => ({
@@ -316,13 +208,10 @@ function parsePeopleSheet(rows) {
       const name = row["姓名"] || row["name"] || row["Name"] || "";
       if (!String(name).trim()) return null;
       return {
-        id:
-          row["編號"] || row["id"] || `P${String(index + 1).padStart(3, "0")}`,
+        id: row["編號"] || row["id"] || `P${String(index + 1).padStart(3, "0")}`,
         name: String(name).trim(),
         type: normalizeType(row["身分"] || row["type"]),
-        family: String(
-          row["家庭/群組"] || row["家庭群組"] || row["family"] || "",
-        ).trim(),
+        family: String(row["家庭/群組"] || row["家庭群組"] || row["family"] || "").trim(),
         gender: normalizeGender(row["性別"] || row["gender"]),
         note: String(row["備註"] || row["note"] || "").trim(),
       };
@@ -333,15 +222,12 @@ function parsePeopleSheet(rows) {
 function parseRoomsSheet(rows) {
   const parsed = rows
     .map((row, index) => {
-      const name =
-        row["房間名稱"] || row["name"] || row["房名"] || `房間${index + 1}`;
+      const name = row["房間名稱"] || row["name"] || row["房名"] || `房間${index + 1}`;
       const bedCount = Number(row["床位數"] || row["beds"] || row["床數"] || 0);
       if (!name || !bedCount) return null;
       const id = row["房間編號"] || row["id"] || uid("R");
       const room = buildRoom(id, String(name), bedCount);
-      room.lockGender = ["male", "female", "mixed", "auto"].includes(
-        row["房間性別"],
-      )
+      room.lockGender = ["male", "female", "mixed", "auto"].includes(row["房間性別"])
         ? row["房間性別"]
         : "auto";
       room.floor = String(row["樓層"] || "");
@@ -364,14 +250,7 @@ function groupPeopleForAutoAssign(people) {
     members,
     bedNeed: members.filter((p) => TYPE_META[p.type].needsBed).length,
     size: members.length,
-    adultGenderSet: [
-      ...new Set(
-        members
-          .filter((p) => p.type === "adult")
-          .map((p) => p.gender)
-          .filter((g) => g === "male" || g === "female"),
-      ),
-    ],
+    adultGenderSet: [...new Set(members.filter((p) => p.type === "adult").map((p) => p.gender).filter((g) => g === "male" || g === "female"))],
   }));
 }
 
@@ -385,8 +264,7 @@ function canGroupEnterRoom(group, room, people, separateGender) {
 
   if (!separateGender) return true;
 
-  if (group.adultGenderSet.length > 1)
-    return targetGender === "mixed" || targetGender === "unassigned";
+  if (group.adultGenderSet.length > 1) return targetGender === "mixed" || targetGender === "unassigned";
   if (group.adultGenderSet.length === 0) return true;
 
   const g = group.adultGenderSet[0];
@@ -412,9 +290,7 @@ function autoAssignPeople(people, rooms, options) {
   groups.forEach((group) => {
     const strictCandidates = cleanRooms
       .map((room) => ({ room, stats: roomStats(room, people) }))
-      .filter(({ room }) =>
-        canGroupEnterRoom(group, room, people, options.separateGender),
-      )
+      .filter(({ room }) => canGroupEnterRoom(group, room, people, options.separateGender))
       .sort((a, b) => {
         const remA = a.room.beds.length - (a.stats.needBeds + group.bedNeed);
         const remB = b.room.beds.length - (b.stats.needBeds + group.bedNeed);
@@ -423,39 +299,22 @@ function autoAssignPeople(people, rooms, options) {
 
     const softCandidates = cleanRooms
       .map((room) => ({ room, stats: roomStats(room, people) }))
-      .filter(
-        ({ room, stats }) => stats.needBeds + group.bedNeed <= room.beds.length,
-      )
-      .sort(
-        (a, b) =>
-          a.room.beds.length -
-          (a.stats.needBeds + group.bedNeed) -
-          (b.room.beds.length - (b.stats.needBeds + group.bedNeed)),
-      );
+      .filter(({ room, stats }) => stats.needBeds + group.bedNeed <= room.beds.length)
+      .sort((a, b) => (a.room.beds.length - (a.stats.needBeds + group.bedNeed)) - (b.room.beds.length - (b.stats.needBeds + group.bedNeed)));
 
-    const target =
-      (options.keepFamilyTogether
-        ? strictCandidates[0]
-        : strictCandidates[0] || softCandidates[0]) ||
-      (options.keepFamilyTogether ? softCandidates[0] : null);
+    const target = (options.keepFamilyTogether ? strictCandidates[0] : strictCandidates[0] || softCandidates[0]) || (options.keepFamilyTogether ? softCandidates[0] : null);
 
     if (!target) {
       overflow.push(...group.members.map((m) => m.id));
       return;
     }
 
-    target.room.members = [
-      ...target.room.members,
-      ...group.members.map((m) => m.id),
-    ];
+    target.room.members = [...target.room.members, ...group.members.map((m) => m.id)];
     const refilled = fillBedsSequentially(target.room, people);
     Object.assign(target.room, refilled);
   });
 
-  return {
-    rooms: cleanRooms.map((room) => fillBedsSequentially(room, people)),
-    overflow,
-  };
+  return { rooms: cleanRooms.map((room) => fillBedsSequentially(room, people)), overflow };
 }
 
 function usePersistentState() {
@@ -493,13 +352,7 @@ export default function RoomPlannerPro() {
   const [newRoomName, setNewRoomName] = useState("");
   const [newRoomBeds, setNewRoomBeds] = useState("2");
   const [newRoomGender, setNewRoomGender] = useState("auto");
-  const [form, setForm] = useState({
-    name: "",
-    type: "adult",
-    family: "",
-    gender: "unknown",
-    note: "",
-  });
+  const [form, setForm] = useState({ name: "", type: "adult", family: "", gender: "unknown", note: "" });
   const peopleFileRef = useRef(null);
   const roomsFileRef = useRef(null);
 
@@ -515,19 +368,7 @@ export default function RoomPlannerPro() {
   const filteredUnassigned = useMemo(() => {
     const q = search.trim().toLowerCase();
     return unassignedPeople.filter((p) => {
-      const okSearch =
-        !q ||
-        [
-          p.name,
-          p.id,
-          p.family,
-          p.note,
-          TYPE_META[p.type].label,
-          GENDER_META[p.gender].label,
-        ]
-          .join(" ")
-          .toLowerCase()
-          .includes(q);
+      const okSearch = !q || [p.name, p.id, p.family, p.note, TYPE_META[p.type].label, GENDER_META[p.gender].label].join(" ").toLowerCase().includes(q);
       const okFilter = activeFilter === "all" || p.type === activeFilter;
       return okSearch && okFilter;
     });
@@ -535,11 +376,7 @@ export default function RoomPlannerPro() {
 
   const totals = useMemo(() => {
     const totalBeds = rooms.reduce((sum, room) => sum + room.beds.length, 0);
-    const usedBeds = rooms.reduce(
-      (sum, room) =>
-        sum + Object.values(room.bedAssignments).filter(Boolean).length,
-      0,
-    );
+    const usedBeds = rooms.reduce((sum, room) => sum + Object.values(room.bedAssignments).filter(Boolean).length, 0);
     const bedNeed = people.filter((p) => TYPE_META[p.type].needsBed).length;
     return {
       people: people.length,
@@ -555,11 +392,7 @@ export default function RoomPlannerPro() {
   }, [people, rooms]);
 
   function patchStore(next) {
-    setStore((prev) => ({
-      ...prev,
-      ...next,
-      lastSyncedAt: new Date().toLocaleString("zh-TW"),
-    }));
+    setStore((prev) => ({ ...prev, ...next, lastSyncedAt: new Date().toLocaleString("zh-TW") }));
   }
 
   function setRooms(nextRooms) {
@@ -583,12 +416,7 @@ export default function RoomPlannerPro() {
     if (!person) return;
     let next = clearPersonFromRooms(rooms, personId).map((room) => {
       if (room.id !== roomId) return room;
-      const merged = {
-        ...room,
-        members: room.members.includes(personId)
-          ? room.members
-          : [...room.members, personId],
-      };
+      const merged = { ...room, members: room.members.includes(personId) ? room.members : [...room.members, personId] };
       return fillBedsSequentially(merged, people);
     });
     setRooms(next);
@@ -601,14 +429,9 @@ export default function RoomPlannerPro() {
     next = next.map((room) => {
       if (room.id !== roomId) return room;
       const assignments = { ...room.bedAssignments };
-      const members = room.members.includes(personId)
-        ? room.members
-        : [...room.members, personId];
+      const members = room.members.includes(personId) ? room.members : [...room.members, personId];
       if (TYPE_META[person.type].needsBed) assignments[bedId] = personId;
-      return fillBedsSequentially(
-        { ...room, members, bedAssignments: assignments },
-        people,
-      );
+      return fillBedsSequentially({ ...room, members, bedAssignments: assignments }, people);
     });
     setRooms(next);
   }
@@ -626,13 +449,7 @@ export default function RoomPlannerPro() {
         note: form.note.trim(),
       },
     ]);
-    setForm({
-      name: "",
-      type: "adult",
-      family: "",
-      gender: "unknown",
-      note: "",
-    });
+    setForm({ name: "", type: "adult", family: "", gender: "unknown", note: "" });
   }
 
   function addRoom() {
@@ -653,9 +470,7 @@ export default function RoomPlannerPro() {
     if (mode === "people") {
       const parsed = parsePeopleSheet(rows);
       if (!parsed.length) {
-        setMessage(
-          "找不到可匯入的人員資料，請確認欄位：姓名、身分、家庭/群組、性別、備註",
-        );
+        setMessage("找不到可匯入的人員資料，請確認欄位：姓名、身分、家庭/群組、性別、備註");
         return;
       }
       setPeople(parsed);
@@ -715,11 +530,7 @@ export default function RoomPlannerPro() {
   function autoAssign() {
     const result = autoAssignPeople(people, rooms, settings);
     setRooms(result.rooms);
-    setMessage(
-      result.overflow.length
-        ? `已自動分房，但仍有 ${result.overflow.length} 人未能安排，請補房間或調整床位`
-        : "已完成自動分房",
-    );
+    setMessage(result.overflow.length ? `已自動分房，但仍有 ${result.overflow.length} 人未能安排，請補房間或調整床位` : "已完成自動分房");
   }
 
   function saveSnapshot() {
@@ -731,11 +542,7 @@ export default function RoomPlannerPro() {
     patchStore({
       people: defaultPeople,
       rooms: defaultRooms,
-      settings: {
-        separateGender: true,
-        keepFamilyTogether: true,
-        autoSave: true,
-      },
+      settings: { separateGender: true, keepFamilyTogether: true, autoSave: true },
     });
     setMessage("已重設成示範資料");
   }
@@ -743,20 +550,8 @@ export default function RoomPlannerPro() {
   function downloadTemplates() {
     const wb = XLSX.utils.book_new();
     const peopleTpl = XLSX.utils.json_to_sheet([
-      {
-        姓名: "王大明",
-        身分: "成人",
-        "家庭/群組": "王家",
-        性別: "男",
-        備註: "",
-      },
-      {
-        姓名: "王小寶",
-        身分: "孩童",
-        "家庭/群組": "王家",
-        性別: "男",
-        備註: "不佔床",
-      },
+      { 姓名: "王大明", 身分: "成人", "家庭/群組": "王家", 性別: "男", 備註: "" },
+      { 姓名: "王小寶", 身分: "孩童", "家庭/群組": "王家", 性別: "男", 備註: "不佔床" },
     ]);
     const roomTpl = XLSX.utils.json_to_sheet([
       { 房間名稱: "101房", 床位數: 2, 房間性別: "auto", 樓層: 1, 備註: "" },
@@ -778,39 +573,13 @@ export default function RoomPlannerPro() {
       <div className="mx-auto max-w-7xl space-y-4">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
-              排房間床位系統 Pro
-            </h1>
-            <p className="text-sm text-slate-600 mt-1">
-              Excel / CSV 匯入、自動分房、家庭優先、男女分房、Excel / PDF
-              匯出、本機資料保存、手機可用。
-            </p>
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight">排房間床位系統 Pro</h1>
+            <p className="text-sm text-slate-600 mt-1">Excel / CSV 匯入、自動分房、家庭優先、男女分房、Excel / PDF 匯出、本機資料保存、手機可用。</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              className="rounded-2xl"
-              onClick={downloadTemplates}
-            >
-              <FileSpreadsheet className="mr-2 h-4 w-4" />
-              下載範本
-            </Button>
-            <Button
-              variant="outline"
-              className="rounded-2xl"
-              onClick={saveSnapshot}
-            >
-              <Save className="mr-2 h-4 w-4" />
-              儲存資料
-            </Button>
-            <Button
-              variant="outline"
-              className="rounded-2xl"
-              onClick={resetDemo}
-            >
-              <RotateCcw className="mr-2 h-4 w-4" />
-              重設
-            </Button>
+            <Button variant="outline" className="rounded-2xl" onClick={downloadTemplates}><FileSpreadsheet className="mr-2 h-4 w-4" />下載範本</Button>
+            <Button variant="outline" className="rounded-2xl" onClick={saveSnapshot}><Save className="mr-2 h-4 w-4" />儲存資料</Button>
+            <Button variant="outline" className="rounded-2xl" onClick={resetDemo}><RotateCcw className="mr-2 h-4 w-4" />重設</Button>
           </div>
         </div>
 
@@ -828,55 +597,15 @@ export default function RoomPlannerPro() {
           </Alert>
         )}
 
-        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
-          <StatCard
-            title="總名單"
-            value={totals.people}
-            sub={`${totals.adults}成人 / ${totals.children}孩童 / ${totals.infants}幼兒`}
-            icon={Users}
-          />
-          <StatCard
-            title="家庭數"
-            value={totals.familyCount}
-            sub="依家庭群組統計"
-            icon={Home}
-          />
-          <StatCard
-            title="房間數"
-            value={totals.roomCount}
-            sub="可自訂房型"
-            icon={Home}
-          />
-          <StatCard
-            title="總床位"
-            value={totals.totalBeds}
-            sub={`已使用 ${totals.usedBeds}`}
-            icon={BedDouble}
-          />
-          <StatCard
-            title="需床位"
-            value={totals.bedNeed}
-            sub="只計成人"
-            icon={UserRound}
-          />
-          <StatCard
-            title="未安排"
-            value={unassignedPeople.length}
-            sub="尚未入住房間"
-            icon={Filter}
-          />
-          <StatCard
-            title="免床位"
-            value={totals.children + totals.infants}
-            sub="孩童 + 幼兒"
-            icon={Baby}
-          />
-          <StatCard
-            title="同步狀態"
-            value={store.lastSyncedAt ? "已保存" : "未保存"}
-            sub={store.lastSyncedAt || "尚未寫入"}
-            icon={Database}
-          />
+        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-4 gap-3">
+          <StatCard title="總名單" value={totals.people} sub={`${totals.adults}成人 / ${totals.children}孩童 / ${totals.infants}幼兒`} icon={Users} />
+          <StatCard title="家庭數" value={totals.familyCount} sub="依家庭群組統計" icon={Home} />
+          <StatCard title="房間數" value={totals.roomCount} sub="可自訂房型" icon={Home} />
+          <StatCard title="總床位" value={totals.totalBeds} sub={`已使用 ${totals.usedBeds}`} icon={BedDouble} />
+          <StatCard title="需床位" value={totals.bedNeed} sub="只計成人" icon={UserRound} />
+          <StatCard title="未安排" value={unassignedPeople.length} sub="尚未入住房間" icon={Filter} />
+          <StatCard title="免床位" value={totals.children + totals.infants} sub="孩童 + 幼兒" icon={Baby} />
+          <StatCard title="同步狀態" value={store.lastSyncedAt ? "已保存" : "未保存"} sub={store.lastSyncedAt || "尚未寫入"} icon={Database} />
         </div>
 
         <Tabs defaultValue="planner" className="space-y-4">
@@ -888,61 +617,23 @@ export default function RoomPlannerPro() {
 
           <TabsContent value="planner" className="space-y-4">
             <div className="flex flex-wrap gap-2">
-              <Button className="rounded-2xl" onClick={autoAssign}>
-                <Wand2 className="mr-2 h-4 w-4" />
-                一鍵自動分房
-              </Button>
-              <Button
-                variant="outline"
-                className="rounded-2xl"
-                onClick={exportExcel}
-              >
-                <Download className="mr-2 h-4 w-4" />
-                匯出 Excel
-              </Button>
-              <Button
-                variant="outline"
-                className="rounded-2xl"
-                onClick={exportPdf}
-              >
-                <FileText className="mr-2 h-4 w-4" />
-                匯出 PDF
-              </Button>
-              <Button
-                variant="outline"
-                className="rounded-2xl"
-                onClick={() =>
-                  patchStore({
-                    lastSyncedAt: new Date().toLocaleString("zh-TW"),
-                  })
-                }
-              >
-                <RefreshCcw className="mr-2 h-4 w-4" />
-                同步標記
-              </Button>
+              <Button className="rounded-2xl" onClick={autoAssign}><Wand2 className="mr-2 h-4 w-4" />一鍵自動分房</Button>
+              <Button variant="outline" className="rounded-2xl" onClick={exportExcel}><Download className="mr-2 h-4 w-4" />匯出 Excel</Button>
+              <Button variant="outline" className="rounded-2xl" onClick={exportPdf}><FileText className="mr-2 h-4 w-4" />匯出 PDF</Button>
+              <Button variant="outline" className="rounded-2xl" onClick={() => patchStore({ lastSyncedAt: new Date().toLocaleString("zh-TW") })}><RefreshCcw className="mr-2 h-4 w-4" />同步標記</Button>
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-[330px,1fr] gap-4 items-start">
-              <Card className="rounded-2xl shadow-sm xl:sticky xl:top-4">
+              <Card className="rounded-2xl shadow-sm self-start">
                 <CardHeader className="pb-3">
                   <CardTitle>未安排名單</CardTitle>
                   <div className="mt-2 space-y-2">
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                      <Input
-                        className="pl-9 rounded-xl"
-                        placeholder="搜尋姓名 / 家庭 / 備註"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                      />
+                      <Input className="pl-9 rounded-xl" placeholder="搜尋姓名 / 家庭 / 備註" value={search} onChange={(e) => setSearch(e.target.value)} />
                     </div>
-                    <Select
-                      value={activeFilter}
-                      onValueChange={setActiveFilter}
-                    >
-                      <SelectTrigger className="rounded-xl">
-                        <SelectValue />
-                      </SelectTrigger>
+                    <Select value={activeFilter} onValueChange={setActiveFilter}>
+                      <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">全部身分</SelectItem>
                         <SelectItem value="adult">只看成人</SelectItem>
@@ -956,20 +647,9 @@ export default function RoomPlannerPro() {
                   <ScrollArea className="h-[65vh] pr-3">
                     <div className="space-y-2">
                       {filteredUnassigned.map((person) => (
-                        <PersonCard
-                          key={person.id}
-                          person={person}
-                          onDragStart={() =>
-                            setDragData({ personId: person.id })
-                          }
-                          onDragEnd={() => setDragData(null)}
-                        />
+                        <PersonCard key={person.id} person={person} onDragStart={() => setDragData({ personId: person.id })} onDragEnd={() => setDragData(null)} />
                       ))}
-                      {!filteredUnassigned.length && (
-                        <div className="rounded-2xl border border-dashed p-6 text-center text-sm text-slate-500">
-                          沒有符合條件的未安排人員
-                        </div>
-                      )}
+                      {!filteredUnassigned.length && <div className="rounded-2xl border border-dashed p-6 text-center text-sm text-slate-500">沒有符合條件的未安排人員</div>}
                     </div>
                   </ScrollArea>
                 </CardContent>
@@ -985,96 +665,50 @@ export default function RoomPlannerPro() {
                         onDragOver={(e) => e.preventDefault()}
                         onDrop={(e) => {
                           e.preventDefault();
-                          if (dragData?.personId)
-                            assignToRoom(dragData.personId, room.id);
+                          if (dragData?.personId) assignToRoom(dragData.personId, room.id);
                           setDragData(null);
                         }}
                       >
                         <CardHeader className="pb-3">
                           <div className="flex items-start justify-between gap-3">
                             <div>
-                              <CardTitle className="text-lg flex items-center gap-2">
-                                <Home className="h-5 w-5" />
-                                {room.name}
-                              </CardTitle>
-                              <p className="text-sm text-slate-600 mt-1">
-                                {stats.members.length} 人 / 需床位{" "}
-                                {stats.needBeds} / 床位 {stats.totalBeds}
-                              </p>
+                              <CardTitle className="text-lg flex items-center gap-2"><Home className="h-5 w-5" />{room.name}</CardTitle>
+                              <p className="text-sm text-slate-600 mt-1">{stats.members.length} 人 / 需床位 {stats.needBeds} / 床位 {stats.totalBeds}</p>
                             </div>
                             <div className="flex flex-col items-end gap-1">
-                              <Badge
-                                className={
-                                  stats.extra
-                                    ? "bg-red-100 text-red-800"
-                                    : "bg-emerald-100 text-emerald-800"
-                                }
-                              >
-                                {stats.extra
-                                  ? `超出 ${stats.extra} 床`
-                                  : `剩餘 ${stats.totalBeds - stats.needBeds} 床`}
-                              </Badge>
-                              <Badge variant="outline">
-                                {room.lockGender === "auto"
-                                  ? `房間性別：${stats.inferredGender}`
-                                  : `鎖定：${room.lockGender}`}
-                              </Badge>
+                              <Badge className={stats.extra ? "bg-red-100 text-red-800" : "bg-emerald-100 text-emerald-800"}>{stats.extra ? `超出 ${stats.extra} 床` : `剩餘 ${stats.totalBeds - stats.needBeds} 床`}</Badge>
+                              <Badge variant="outline">{room.lockGender === "auto" ? `房間性別：${stats.inferredGender}` : `鎖定：${room.lockGender}`}</Badge>
                             </div>
                           </div>
                         </CardHeader>
                         <CardContent className="space-y-4">
                           <div>
-                            <div className="text-sm font-medium mb-2">
-                              床位區
-                            </div>
+                            <div className="text-sm font-medium mb-2">床位區</div>
                             <div className="grid grid-cols-2 gap-2">
                               {room.beds.map((bed) => {
-                                const occupant = personById(
-                                  people,
-                                  room.bedAssignments[bed.id],
-                                );
+                                const occupant = personById(people, room.bedAssignments[bed.id]);
                                 return (
                                   <div
                                     key={bed.id}
                                     onDragOver={(e) => e.preventDefault()}
                                     onDrop={(e) => {
                                       e.preventDefault();
-                                      if (dragData?.personId)
-                                        assignToBed(
-                                          dragData.personId,
-                                          room.id,
-                                          bed.id,
-                                        );
+                                      if (dragData?.personId) assignToBed(dragData.personId, room.id, bed.id);
                                       setDragData(null);
                                     }}
                                     className="rounded-2xl border bg-white p-3 min-h-[92px]"
                                   >
-                                    <div className="text-sm font-medium flex items-center gap-2">
-                                      <BedDouble className="h-4 w-4" />
-                                      {bed.label}
-                                    </div>
+                                    <div className="text-sm font-medium flex items-center gap-2"><BedDouble className="h-4 w-4" />{bed.label}</div>
                                     {occupant ? (
                                       <div className="mt-3 rounded-xl bg-slate-50 p-2">
-                                        <div className="text-sm font-medium truncate">
-                                          {occupant.name}
-                                        </div>
+                                        <div className="text-sm font-medium truncate">{occupant.name}</div>
                                         <div className="mt-1 flex flex-wrap gap-1">
-                                          <Badge
-                                            className={
-                                              TYPE_META[occupant.type].badge
-                                            }
-                                          >
-                                            {TYPE_META[occupant.type].label}
-                                          </Badge>
-                                          <Badge variant="outline">
-                                            {GENDER_META[occupant.gender].label}
-                                          </Badge>
+                                          <Badge className={TYPE_META[occupant.type].badge}>{TYPE_META[occupant.type].label}</Badge>
+                                          <Badge variant="outline">{GENDER_META[occupant.gender].label}</Badge>
                                         </div>
                                       </div>
                                     ) : (
-                                      <div className="mt-3 text-xs text-slate-400">
-                                        拖拉成人到這張床
-                                      </div>
+                                      <div className="mt-3 text-xs text-slate-400">拖拉成人到這張床</div>
                                     )}
                                   </div>
                                 );
@@ -1083,52 +717,22 @@ export default function RoomPlannerPro() {
                           </div>
                           <Separator />
                           <div>
-                            <div className="text-sm font-medium mb-2">
-                              房內成員
-                            </div>
+                            <div className="text-sm font-medium mb-2">房內成員</div>
                             <div className="flex flex-wrap gap-2">
                               {stats.members.map((person) => {
-                                const assigned = Object.values(
-                                  room.bedAssignments,
-                                ).includes(person.id);
+                                const assigned = Object.values(room.bedAssignments).includes(person.id);
                                 return (
-                                  <div
-                                    key={person.id}
-                                    className="flex items-center gap-2 rounded-full border bg-slate-50 px-3 py-1.5"
-                                  >
+                                  <div key={person.id} className="flex items-center gap-2 rounded-full border bg-slate-50 px-3 py-1.5">
                                     <GripVertical className="h-3.5 w-3.5 text-slate-400" />
-                                    <span className="text-sm">
-                                      {person.name}
-                                    </span>
-                                    <Badge
-                                      className={TYPE_META[person.type].badge}
-                                    >
-                                      {TYPE_META[person.type].label}
-                                    </Badge>
-                                    {!!person.family && (
-                                      <Badge variant="outline">
-                                        {person.family}
-                                      </Badge>
-                                    )}
-                                    <Badge variant="outline">
-                                      {assigned ? "已排床" : "不佔床"}
-                                    </Badge>
-                                    <button
-                                      className="text-xs text-red-500"
-                                      onClick={() =>
-                                        removePersonFromAll(person.id)
-                                      }
-                                    >
-                                      移除
-                                    </button>
+                                    <span className="text-sm">{person.name}</span>
+                                    <Badge className={TYPE_META[person.type].badge}>{TYPE_META[person.type].label}</Badge>
+                                    {!!person.family && <Badge variant="outline">{person.family}</Badge>}
+                                    <Badge variant="outline">{assigned ? "已排床" : "不佔床"}</Badge>
+                                    <button className="text-xs text-red-500" onClick={() => removePersonFromAll(person.id)}>移除</button>
                                   </div>
                                 );
                               })}
-                              {!stats.members.length && (
-                                <div className="text-sm text-slate-400">
-                                  拖拉人員到此房間
-                                </div>
-                              )}
+                              {!stats.members.length && <div className="text-sm text-slate-400">拖拉人員到此房間</div>}
                             </div>
                           </div>
                         </CardContent>
@@ -1143,100 +747,38 @@ export default function RoomPlannerPro() {
           <TabsContent value="import" className="space-y-4">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <Card className="rounded-2xl shadow-sm">
-                <CardHeader>
-                  <CardTitle>匯入人員 Excel / CSV</CardTitle>
-                </CardHeader>
+                <CardHeader><CardTitle>匯入人員 Excel / CSV</CardTitle></CardHeader>
                 <CardContent className="space-y-3">
-                  <input
-                    ref={peopleFileRef}
-                    type="file"
-                    accept=".xlsx,.xls,.csv"
-                    className="hidden"
-                    onChange={(e) =>
-                      e.target.files?.[0] &&
-                      importWorkbook(e.target.files[0], "people")
-                    }
-                  />
-                  <Button
-                    className="rounded-2xl w-full"
-                    onClick={() => peopleFileRef.current?.click()}
-                  >
-                    <Upload className="mr-2 h-4 w-4" />
-                    選擇人員檔案
-                  </Button>
-                  <div className="text-sm text-slate-600 leading-6">
-                    支援欄位：姓名、身分、家庭/群組、性別、備註。可直接匯入 100+
-                    筆資料。
-                  </div>
+                  <input ref={peopleFileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => e.target.files?.[0] && importWorkbook(e.target.files[0], "people")} />
+                  <Button className="rounded-2xl w-full" onClick={() => peopleFileRef.current?.click()}><Upload className="mr-2 h-4 w-4" />選擇人員檔案</Button>
+                  <div className="text-sm text-slate-600 leading-6">支援欄位：姓名、身分、家庭/群組、性別、備註。可直接匯入 100+ 筆資料。</div>
                 </CardContent>
               </Card>
 
               <Card className="rounded-2xl shadow-sm">
-                <CardHeader>
-                  <CardTitle>匯入房間 Excel / CSV</CardTitle>
-                </CardHeader>
+                <CardHeader><CardTitle>匯入房間 Excel / CSV</CardTitle></CardHeader>
                 <CardContent className="space-y-3">
-                  <input
-                    ref={roomsFileRef}
-                    type="file"
-                    accept=".xlsx,.xls,.csv"
-                    className="hidden"
-                    onChange={(e) =>
-                      e.target.files?.[0] &&
-                      importWorkbook(e.target.files[0], "rooms")
-                    }
-                  />
-                  <Button
-                    className="rounded-2xl w-full"
-                    onClick={() => roomsFileRef.current?.click()}
-                  >
-                    <Upload className="mr-2 h-4 w-4" />
-                    選擇房間檔案
-                  </Button>
-                  <div className="text-sm text-slate-600 leading-6">
-                    支援欄位：房間名稱、床位數、房間性別、樓層、備註。
-                  </div>
+                  <input ref={roomsFileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => e.target.files?.[0] && importWorkbook(e.target.files[0], "rooms")} />
+                  <Button className="rounded-2xl w-full" onClick={() => roomsFileRef.current?.click()}><Upload className="mr-2 h-4 w-4" />選擇房間檔案</Button>
+                  <div className="text-sm text-slate-600 leading-6">支援欄位：房間名稱、床位數、房間性別、樓層、備註。</div>
                 </CardContent>
               </Card>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <Card className="rounded-2xl shadow-sm">
-                <CardHeader>
-                  <CardTitle>匯出結果</CardTitle>
-                </CardHeader>
+                <CardHeader><CardTitle>匯出結果</CardTitle></CardHeader>
                 <CardContent className="space-y-3">
-                  <Button
-                    variant="outline"
-                    className="rounded-2xl w-full"
-                    onClick={exportExcel}
-                  >
-                    <FileSpreadsheet className="mr-2 h-4 w-4" />
-                    匯出 Excel
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="rounded-2xl w-full"
-                    onClick={exportPdf}
-                  >
-                    <FileText className="mr-2 h-4 w-4" />
-                    匯出 PDF
-                  </Button>
+                  <Button variant="outline" className="rounded-2xl w-full" onClick={exportExcel}><FileSpreadsheet className="mr-2 h-4 w-4" />匯出 Excel</Button>
+                  <Button variant="outline" className="rounded-2xl w-full" onClick={exportPdf}><FileText className="mr-2 h-4 w-4" />匯出 PDF</Button>
                 </CardContent>
               </Card>
 
               <Card className="rounded-2xl shadow-sm">
-                <CardHeader>
-                  <CardTitle>資料庫與同步說明</CardTitle>
-                </CardHeader>
+                <CardHeader><CardTitle>資料庫與同步說明</CardTitle></CardHeader>
                 <CardContent className="space-y-3 text-sm leading-6 text-slate-700">
-                  <div>
-                    目前這個單檔版已經有「本機資料保存」功能，關閉後再開仍可保留資料。
-                  </div>
-                  <div>
-                    若要真正做到手機與電腦即時同步，需要接上雲端資料庫，例如
-                    Supabase / Firebase / MySQL API。
-                  </div>
+                  <div>目前這個單檔版已經有「本機資料保存」功能，關閉後再開仍可保留資料。</div>
+                  <div>若要真正做到手機與電腦即時同步，需要接上雲端資料庫，例如 Supabase / Firebase / MySQL API。</div>
                   <div>這個前端結構已經整理好，後續可直接接雲端後端。</div>
                 </CardContent>
               </Card>
@@ -1246,78 +788,39 @@ export default function RoomPlannerPro() {
           <TabsContent value="settings" className="space-y-4">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <Card className="rounded-2xl shadow-sm">
-                <CardHeader>
-                  <CardTitle>分房規則</CardTitle>
-                </CardHeader>
+                <CardHeader><CardTitle>分房規則</CardTitle></CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex items-center justify-between rounded-xl border p-3">
                     <div>
                       <Label>同家庭盡量同房</Label>
-                      <div className="text-xs text-slate-500 mt-1">
-                        自動分房時優先把同家庭排進同一間
-                      </div>
+                      <div className="text-xs text-slate-500 mt-1">自動分房時優先把同家庭排進同一間</div>
                     </div>
-                    <Switch
-                      checked={settings.keepFamilyTogether}
-                      onCheckedChange={(v) =>
-                        setSettings({ keepFamilyTogether: v })
-                      }
-                    />
+                    <Switch checked={settings.keepFamilyTogether} onCheckedChange={(v) => setSettings({ keepFamilyTogether: v })} />
                   </div>
                   <div className="flex items-center justify-between rounded-xl border p-3">
                     <div>
                       <Label>男女分房</Label>
-                      <div className="text-xs text-slate-500 mt-1">
-                        成人依性別優先分開，混合家庭需用 mixed / auto 房
-                      </div>
+                      <div className="text-xs text-slate-500 mt-1">成人依性別優先分開，混合家庭需用 mixed / auto 房</div>
                     </div>
-                    <Switch
-                      checked={settings.separateGender}
-                      onCheckedChange={(v) =>
-                        setSettings({ separateGender: v })
-                      }
-                    />
+                    <Switch checked={settings.separateGender} onCheckedChange={(v) => setSettings({ separateGender: v })} />
                   </div>
                   <div className="flex items-center justify-between rounded-xl border p-3">
                     <div>
                       <Label>自動保存</Label>
-                      <div className="text-xs text-slate-500 mt-1">
-                        每次修改自動寫入本機資料庫
-                      </div>
+                      <div className="text-xs text-slate-500 mt-1">每次修改自動寫入本機資料庫</div>
                     </div>
-                    <Switch
-                      checked={settings.autoSave}
-                      onCheckedChange={(v) => setSettings({ autoSave: v })}
-                    />
+                    <Switch checked={settings.autoSave} onCheckedChange={(v) => setSettings({ autoSave: v })} />
                   </div>
                 </CardContent>
               </Card>
 
               <Card className="rounded-2xl shadow-sm">
-                <CardHeader>
-                  <CardTitle>新增房間</CardTitle>
-                </CardHeader>
+                <CardHeader><CardTitle>新增房間</CardTitle></CardHeader>
                 <CardContent className="space-y-3">
-                  <Input
-                    value={newRoomName}
-                    onChange={(e) => setNewRoomName(e.target.value)}
-                    placeholder="房間名稱，例如 303房"
-                    className="rounded-xl"
-                  />
-                  <Input
-                    value={newRoomBeds}
-                    onChange={(e) => setNewRoomBeds(e.target.value)}
-                    type="number"
-                    placeholder="床位數"
-                    className="rounded-xl"
-                  />
-                  <Select
-                    value={newRoomGender}
-                    onValueChange={setNewRoomGender}
-                  >
-                    <SelectTrigger className="rounded-xl">
-                      <SelectValue placeholder="房間性別" />
-                    </SelectTrigger>
+                  <Input value={newRoomName} onChange={(e) => setNewRoomName(e.target.value)} placeholder="房間名稱，例如 303房" className="rounded-xl" />
+                  <Input value={newRoomBeds} onChange={(e) => setNewRoomBeds(e.target.value)} type="number" placeholder="床位數" className="rounded-xl" />
+                  <Select value={newRoomGender} onValueChange={setNewRoomGender}>
+                    <SelectTrigger className="rounded-xl"><SelectValue placeholder="房間性別" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="auto">自動</SelectItem>
                       <SelectItem value="male">男房</SelectItem>
@@ -1325,54 +828,27 @@ export default function RoomPlannerPro() {
                       <SelectItem value="mixed">混合房</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Button className="rounded-2xl w-full" onClick={addRoom}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    新增房間
-                  </Button>
+                  <Button className="rounded-2xl w-full" onClick={addRoom}><Plus className="mr-2 h-4 w-4" />新增房間</Button>
                 </CardContent>
               </Card>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <Card className="rounded-2xl shadow-sm">
-                <CardHeader>
-                  <CardTitle>新增人員</CardTitle>
-                </CardHeader>
+                <CardHeader><CardTitle>新增人員</CardTitle></CardHeader>
                 <CardContent className="space-y-3">
-                  <Input
-                    value={form.name}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    placeholder="姓名"
-                    className="rounded-xl"
-                  />
-                  <Select
-                    value={form.type}
-                    onValueChange={(v) => setForm({ ...form, type: v })}
-                  >
-                    <SelectTrigger className="rounded-xl">
-                      <SelectValue />
-                    </SelectTrigger>
+                  <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="姓名" className="rounded-xl" />
+                  <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v })}>
+                    <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="adult">成人</SelectItem>
                       <SelectItem value="child">孩童</SelectItem>
                       <SelectItem value="infant">幼兒</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Input
-                    value={form.family}
-                    onChange={(e) =>
-                      setForm({ ...form, family: e.target.value })
-                    }
-                    placeholder="家庭 / 群組"
-                    className="rounded-xl"
-                  />
-                  <Select
-                    value={form.gender}
-                    onValueChange={(v) => setForm({ ...form, gender: v })}
-                  >
-                    <SelectTrigger className="rounded-xl">
-                      <SelectValue />
-                    </SelectTrigger>
+                  <Input value={form.family} onChange={(e) => setForm({ ...form, family: e.target.value })} placeholder="家庭 / 群組" className="rounded-xl" />
+                  <Select value={form.gender} onValueChange={(v) => setForm({ ...form, gender: v })}>
+                    <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="male">男</SelectItem>
                       <SelectItem value="female">女</SelectItem>
@@ -1380,54 +856,18 @@ export default function RoomPlannerPro() {
                       <SelectItem value="unknown">未填</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Textarea
-                    value={form.note}
-                    onChange={(e) => setForm({ ...form, note: e.target.value })}
-                    placeholder="備註"
-                    className="rounded-xl"
-                  />
-                  <Button className="rounded-2xl w-full" onClick={addPerson}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    新增人員
-                  </Button>
+                  <Textarea value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="備註" className="rounded-xl" />
+                  <Button className="rounded-2xl w-full" onClick={addPerson}><Plus className="mr-2 h-4 w-4" />新增人員</Button>
                 </CardContent>
               </Card>
 
               <Card className="rounded-2xl shadow-sm">
-                <CardHeader>
-                  <CardTitle>資料管理</CardTitle>
-                </CardHeader>
+                <CardHeader><CardTitle>資料管理</CardTitle></CardHeader>
                 <CardContent className="space-y-3 text-sm text-slate-700">
-                  <Button
-                    variant="outline"
-                    className="rounded-2xl w-full justify-start"
-                    onClick={() => setPeople([])}
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    清空人員資料
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="rounded-2xl w-full justify-start"
-                    onClick={() => setRooms([])}
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    清空房間資料
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="rounded-2xl w-full justify-start"
-                    onClick={() => {
-                      localStorage.removeItem(STORAGE_KEY);
-                      setMessage("已清除本機資料庫");
-                    }}
-                  >
-                    <Database className="mr-2 h-4 w-4" />
-                    清除本機資料庫
-                  </Button>
-                  <div className="rounded-xl bg-slate-50 p-3 leading-6">
-                    這個版本已完成：匯入、拖拉、規則分房、匯出、本機儲存。真正跨裝置同步仍需外接雲端資料庫與帳號登入。
-                  </div>
+                  <Button variant="outline" className="rounded-2xl w-full justify-start" onClick={() => setPeople([])}><Trash2 className="mr-2 h-4 w-4" />清空人員資料</Button>
+                  <Button variant="outline" className="rounded-2xl w-full justify-start" onClick={() => setRooms([])}><Trash2 className="mr-2 h-4 w-4" />清空房間資料</Button>
+                  <Button variant="outline" className="rounded-2xl w-full justify-start" onClick={() => { localStorage.removeItem(STORAGE_KEY); setMessage("已清除本機資料庫"); }}><Database className="mr-2 h-4 w-4" />清除本機資料庫</Button>
+                  <div className="rounded-xl bg-slate-50 p-3 leading-6">這個版本已完成：匯入、拖拉、規則分房、匯出、本機儲存。真正跨裝置同步仍需外接雲端資料庫與帳號登入。</div>
                 </CardContent>
               </Card>
             </div>
@@ -1448,9 +888,7 @@ function StatCard({ title, value, sub, icon: Icon }) {
             <div className="text-2xl font-bold mt-1">{value}</div>
             <div className="text-xs text-slate-500 mt-1">{sub}</div>
           </div>
-          <div className="rounded-2xl bg-slate-100 p-2">
-            <Icon className="h-5 w-5 text-slate-700" />
-          </div>
+          <div className="rounded-2xl bg-slate-100 p-2"><Icon className="h-5 w-5 text-slate-700" /></div>
         </div>
       </CardContent>
     </Card>
@@ -1459,27 +897,14 @@ function StatCard({ title, value, sub, icon: Icon }) {
 
 function PersonCard({ person, onDragStart, onDragEnd }) {
   return (
-    <div
-      draggable
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
-      className="cursor-grab active:cursor-grabbing rounded-2xl border bg-white p-3 shadow-sm"
-    >
+    <div draggable onDragStart={onDragStart} onDragEnd={onDragEnd} className="cursor-grab active:cursor-grabbing rounded-2xl border bg-white p-3 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="font-medium flex items-center gap-2">
-            <GripVertical className="h-4 w-4 text-slate-400" />
-            {person.name}
-          </div>
-          <div className="text-xs text-slate-500 mt-1">
-            {person.id} {!!person.family && `· ${person.family}`}{" "}
-            {!!person.note && `· ${person.note}`}
-          </div>
+          <div className="font-medium flex items-center gap-2"><GripVertical className="h-4 w-4 text-slate-400" />{person.name}</div>
+          <div className="text-xs text-slate-500 mt-1">{person.id} {!!person.family && `· ${person.family}`} {!!person.note && `· ${person.note}`}</div>
         </div>
         <div className="flex flex-col items-end gap-1">
-          <Badge className={TYPE_META[person.type].badge}>
-            {TYPE_META[person.type].label}
-          </Badge>
+          <Badge className={TYPE_META[person.type].badge}>{TYPE_META[person.type].label}</Badge>
           <Badge variant="outline">{GENDER_META[person.gender].label}</Badge>
         </div>
       </div>
