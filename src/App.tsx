@@ -40,11 +40,45 @@ import {
   Plus,
   Filter,
   CheckCircle2,
+  Hotel as HotelIcon,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 
-const STORAGE_KEY = "room-bed-planner-v3";
+const STORAGE_KEY = "room-bed-planner-v4";
+
+const HOTEL_COLOR_CLASSES = [
+  {
+    card: "border-sky-300 bg-sky-50/40",
+    badge: "bg-sky-100 text-sky-800 border-sky-200",
+    accent: "bg-sky-500",
+    bed: "border-sky-200 bg-sky-50/50",
+  },
+  {
+    card: "border-emerald-300 bg-emerald-50/40",
+    badge: "bg-emerald-100 text-emerald-800 border-emerald-200",
+    accent: "bg-emerald-500",
+    bed: "border-emerald-200 bg-emerald-50/50",
+  },
+  {
+    card: "border-violet-300 bg-violet-50/40",
+    badge: "bg-violet-100 text-violet-800 border-violet-200",
+    accent: "bg-violet-500",
+    bed: "border-violet-200 bg-violet-50/50",
+  },
+  {
+    card: "border-amber-300 bg-amber-50/40",
+    badge: "bg-amber-100 text-amber-800 border-amber-200",
+    accent: "bg-amber-500",
+    bed: "border-amber-200 bg-amber-50/50",
+  },
+  {
+    card: "border-rose-300 bg-rose-50/40",
+    badge: "bg-rose-100 text-rose-800 border-rose-200",
+    accent: "bg-rose-500",
+    bed: "border-rose-200 bg-rose-50/50",
+  },
+] as const;
 
 const TYPE_META = {
   adult: {
@@ -65,9 +99,22 @@ const TYPE_META = {
   infant: { label: "幼兒", needsBed: false, badge: "bg-sky-100 text-sky-800" },
 } as const;
 
+const GENDER_META = {
+  male: { label: "男" },
+  female: { label: "女" },
+  other: { label: "其他" },
+  unknown: { label: "未填" },
+} as const;
+
 type PersonType = keyof typeof TYPE_META;
 type GenderType = keyof typeof GENDER_META;
 type RoomGenderType = "auto" | "male" | "female" | "mixed";
+
+type Hotel = {
+  id: string;
+  name: string;
+  note: string;
+};
 
 type Person = {
   id: string;
@@ -85,6 +132,7 @@ type Bed = {
 
 type Room = {
   id: string;
+  hotelId: string;
   name: string;
   beds: Bed[];
   members: string[];
@@ -101,6 +149,7 @@ type Settings = {
 };
 
 type StoreState = {
+  hotels: Hotel[];
   people: Person[];
   rooms: Room[];
   settings: Settings;
@@ -116,6 +165,7 @@ type GroupedPeople = {
 };
 
 type ExportRow = {
+  飯店: string;
   編號: string;
   姓名: string;
   身分: string;
@@ -128,6 +178,7 @@ type ExportRow = {
 };
 
 type RoomSummaryRow = {
+  飯店: string;
   房間: string;
   房內人數: number;
   需床位人數: number;
@@ -151,6 +202,7 @@ type AddPersonForm = {
 };
 
 type RoomStats = {
+  hotelName: string;
   members: Person[];
   assignedBeds: number;
   totalBeds: number;
@@ -160,14 +212,12 @@ type RoomStats = {
   inferredGender: string;
 };
 
-const GENDER_META = {
-  male: { label: "男" },
-  female: { label: "女" },
-  other: { label: "其他" },
-  unknown: { label: "未填" },
-} as const;
+const defaultHotels: Hotel[] = [
+  { id: "H001", name: "和平飯店", note: "主館" },
+  { id: "H002", name: "恩典旅店", note: "分館" },
+];
 
-const defaultPeople = [
+const defaultPeople: Person[] = [
   {
     id: "P001",
     name: "王大明",
@@ -250,11 +300,11 @@ const defaultPeople = [
   },
 ];
 
-const defaultRooms = [
-  buildRoom("R101", "101房", 2),
-  buildRoom("R102", "102房", 4),
-  buildRoom("R201", "201房", 3),
-  buildRoom("R202", "202房", 5),
+const defaultRooms: Room[] = [
+  { ...buildRoom("R101", "101房", 2), hotelId: "H001" },
+  { ...buildRoom("R102", "102房", 4), hotelId: "H001" },
+  { ...buildRoom("R201", "201房", 3), hotelId: "H002" },
+  { ...buildRoom("R202", "202房", 5), hotelId: "H002" },
 ];
 
 function buildRoom(id: string, name: string, bedCount: number): Room {
@@ -264,6 +314,7 @@ function buildRoom(id: string, name: string, bedCount: number): Room {
   }));
   return {
     id,
+    hotelId: "",
     name,
     beds,
     members: [],
@@ -307,7 +358,9 @@ function personById(
 }
 
 function membersOfRoom(room: Room, people: Person[]): Person[] {
-  return room.members.map((id) => personById(people, id)).filter(Boolean);
+  return room.members
+    .map((id) => personById(people, id))
+    .filter((person): person is Person => Boolean(person));
 }
 
 function bedNeedCount(memberObjects: Person[]): number {
@@ -317,9 +370,9 @@ function bedNeedCount(memberObjects: Person[]): number {
 function adultGenderSet(memberObjects: Person[]): Set<"male" | "female"> {
   return new Set(
     memberObjects
-      .filter((p) => p.type === "adult")
+      .filter((p) => p.type === "adult" || p.type === "student")
       .map((p) => p.gender)
-      .filter((g) => g !== "unknown" && g !== "other"),
+      .filter((g): g is "male" | "female" => g === "male" || g === "female"),
   );
 }
 
@@ -331,13 +384,16 @@ function inferRoomGender(room: Room, people: Person[]): string {
   return "unassigned";
 }
 
-function roomStats(room: Room, people: Person[]): RoomStats {
+function roomStats(room: Room, people: Person[], hotels: Hotel[]): RoomStats {
   const memberObjects = membersOfRoom(room, people);
   const assignedBeds = Object.values(room.bedAssignments).filter(
     Boolean,
   ).length;
   const needBeds = bedNeedCount(memberObjects);
+  const hotelName =
+    hotels.find((hotel) => hotel.id === room.hotelId)?.name || "未分類飯店";
   return {
+    hotelName,
     members: memberObjects,
     assignedBeds,
     totalBeds: room.beds.length,
@@ -370,38 +426,54 @@ function fillBedsSequentially(room: Room, people: Person[]): Room {
     if (
       !person ||
       !TYPE_META[person.type]?.needsBed ||
-      !room.members.includes(pid)
-    )
+      !room.members.includes(pid || "")
+    ) {
       assignments[bedId] = null;
+    }
   });
 
   const currentlyAssigned = new Set(Object.values(assignments).filter(Boolean));
   const needBedPeople = room.members
     .map((id) => personById(people, id))
     .filter(
-      (p) => p && TYPE_META[p.type]?.needsBed && !currentlyAssigned.has(p.id),
+      (p): p is Person =>
+        Boolean(p) &&
+        TYPE_META[p.type]?.needsBed &&
+        !currentlyAssigned.has(p.id),
     );
 
   room.beds.forEach((bed) => {
-    if (!assignments[bed.id] && needBedPeople)
-      assignments[bed.id] = needBedPeople.shift().id;
+    if (!assignments[bed.id] && needBedPeople.length) {
+      assignments[bed.id] = needBedPeople.shift()!.id;
+    }
   });
 
   return { ...room, bedAssignments: assignments };
 }
 
-function exportRows(people: Person[], rooms: Room[]): ExportRow[] {
-  const roomMap = new Map();
+function exportRows(
+  people: Person[],
+  rooms: Room[],
+  hotels: Hotel[],
+): ExportRow[] {
+  const roomMap = new Map<
+    string,
+    { hotelName: string; roomName: string; bedLabel: string }
+  >();
   rooms.forEach((room) => {
     room.members.forEach((id) => {
       const bed = room.beds.find((b) => room.bedAssignments[b.id] === id);
+      const hotelName =
+        hotels.find((hotel) => hotel.id === room.hotelId)?.name || "未分類飯店";
       roomMap.set(id, {
+        hotelName,
         roomName: room.name,
         bedLabel: bed?.label || "不佔床 / 未指定",
       });
     });
   });
   return people.map((p) => ({
+    飯店: roomMap.get(p.id)?.hotelName || "未安排",
     編號: p.id,
     姓名: p.name,
     身分: TYPE_META[p.type].label,
@@ -420,8 +492,9 @@ function parsePeopleSheet(rows: Record<string, unknown>[]): Person[] {
       const name = row["姓名"] || row["name"] || row["Name"] || "";
       if (!String(name).trim()) return null;
       return {
-        id:
+        id: String(
           row["編號"] || row["id"] || `P${String(index + 1).padStart(3, "0")}`,
+        ),
         name: String(name).trim(),
         type: normalizeType(row["身分"] || row["type"]),
         family: String(
@@ -431,37 +504,45 @@ function parsePeopleSheet(rows: Record<string, unknown>[]): Person[] {
         note: String(row["備註"] || row["note"] || "").trim(),
       };
     })
-    .filter(Boolean);
+    .filter((person): person is Person => Boolean(person));
 }
 
-function parseRoomsSheet(rows: Record<string, unknown>[]): Room[] {
-  const parsed = rows
+function parseRoomsSheet(
+  rows: Record<string, unknown>[],
+  hotels: Hotel[],
+): Room[] {
+  return rows
     .map((row, index) => {
       const name =
         row["房間名稱"] || row["name"] || row["房名"] || `房間${index + 1}`;
       const bedCount = Number(row["床位數"] || row["beds"] || row["床數"] || 0);
       if (!name || !bedCount) return null;
-      const id = row["房間編號"] || row["id"] || uid("R");
+      const id = String(row["房間編號"] || row["id"] || uid("R"));
       const room = buildRoom(id, String(name), bedCount);
-      room.lockGender = ["male", "female", "mixed", "auto"].includes(
-        row["房間性別"],
-      )
-        ? row["房間性別"]
+      const hotelName = String(
+        row["飯店名稱"] || row["hotel"] || row["Hotel"] || "",
+      ).trim();
+      const matchedHotel = hotels.find((hotel) => hotel.name === hotelName);
+      room.hotelId = matchedHotel?.id || hotels[0]?.id || "";
+      const roomGender = String(row["房間性別"] || "auto");
+      room.lockGender = (
+        ["male", "female", "mixed", "auto"] as string[]
+      ).includes(roomGender)
+        ? (roomGender as RoomGenderType)
         : "auto";
       room.floor = String(row["樓層"] || "");
       room.note = String(row["備註"] || "");
       return room;
     })
-    .filter(Boolean);
-  return parsed;
+    .filter((room): room is Room => Boolean(room));
 }
 
 function groupPeopleForAutoAssign(people: Person[]): GroupedPeople[] {
-  const map = new Map();
+  const map = new Map<string, Person[]>();
   people.forEach((person) => {
     const key = person.family?.trim() || `__solo__${person.id}`;
     if (!map.has(key)) map.set(key, []);
-    map.get(key).push(person);
+    map.get(key)!.push(person);
   });
   return [...map.entries()].map(([key, members]) => ({
     key,
@@ -471,9 +552,11 @@ function groupPeopleForAutoAssign(people: Person[]): GroupedPeople[] {
     adultGenderSet: [
       ...new Set(
         members
-          .filter((p) => p.type === "adult")
+          .filter((p) => p.type === "adult" || p.type === "student")
           .map((p) => p.gender)
-          .filter((g) => g === "male" || g === "female"),
+          .filter(
+            (g): g is "male" | "female" => g === "male" || g === "female",
+          ),
       ),
     ],
   }));
@@ -483,30 +566,29 @@ function canGroupEnterRoom(
   group: GroupedPeople,
   room: Room,
   people: Person[],
+  hotels: Hotel[],
   separateGender: boolean,
 ): boolean {
-  const stats = roomStats(room, people);
+  const stats = roomStats(room, people, hotels);
   const roomGender = stats.inferredGender;
   const locked = room.lockGender;
   const targetGender = locked !== "auto" ? locked : roomGender;
 
   if (stats.needBeds + group.bedNeed > room.beds.length) return false;
-
   if (!separateGender) return true;
-
   if (group.adultGenderSet.length > 1)
     return targetGender === "mixed" || targetGender === "unassigned";
   if (group.adultGenderSet.length === 0) return true;
 
   const g = group.adultGenderSet[0];
-  if (["mixed"].includes(targetGender)) return true;
-  if (["unassigned"].includes(targetGender)) return true;
+  if (["mixed", "unassigned"].includes(targetGender)) return true;
   return targetGender === g;
 }
 
 function autoAssignPeople(
   people: Person[],
   rooms: Room[],
+  hotels: Hotel[],
   options: Settings,
 ): { rooms: Room[]; overflow: string[] } {
   const cleanRooms = rooms.map((room) => ({
@@ -520,13 +602,13 @@ function autoAssignPeople(
     return b.size - a.size;
   });
 
-  const overflow = [];
+  const overflow: string[] = [];
 
   groups.forEach((group) => {
     const strictCandidates = cleanRooms
-      .map((room) => ({ room, stats: roomStats(room, people) }))
+      .map((room) => ({ room, stats: roomStats(room, people, hotels) }))
       .filter(({ room }) =>
-        canGroupEnterRoom(group, room, people, options.separateGender),
+        canGroupEnterRoom(group, room, people, hotels, options.separateGender),
       )
       .sort((a, b) => {
         const remA = a.room.beds.length - (a.stats.needBeds + group.bedNeed);
@@ -535,10 +617,8 @@ function autoAssignPeople(
       });
 
     const softCandidates = cleanRooms
-      .map((room) => ({ room, stats: roomStats(room, people) }))
-      .filter(
-        ({ room, stats }) => stats.needBeds + group.bedNeed <= room.beds.length,
-      )
+      .map((room) => ({ room, stats: roomStats(room, people, hotels) }))
+      .filter(({ stats }) => stats.needBeds + group.bedNeed <= stats.totalBeds)
       .sort(
         (a, b) =>
           a.room.beds.length -
@@ -561,8 +641,7 @@ function autoAssignPeople(
       ...target.room.members,
       ...group.members.map((m) => m.id),
     ];
-    const refilled = fillBedsSequentially(target.room, people);
-    Object.assign(target.room, refilled);
+    Object.assign(target.room, fillBedsSequentially(target.room, people));
   });
 
   return {
@@ -575,12 +654,13 @@ function usePersistentState(): [
   StoreState,
   React.Dispatch<React.SetStateAction<StoreState>>,
 ] {
-  const [state, setState] = useState(() => {
+  const [state, setState] = useState<StoreState>(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) return JSON.parse(raw);
+      if (raw) return JSON.parse(raw) as StoreState;
     } catch {}
     return {
+      hotels: defaultHotels,
       people: defaultPeople,
       rooms: defaultRooms,
       settings: {
@@ -600,15 +680,28 @@ function usePersistentState(): [
   return [state, setState];
 }
 
+function getHotelStyle(hotels: Hotel[], hotelId: string) {
+  const hotelIndex = Math.max(
+    0,
+    hotels.findIndex((hotel) => hotel.id === hotelId),
+  );
+  return HOTEL_COLOR_CLASSES[hotelIndex % HOTEL_COLOR_CLASSES.length];
+}
+
 export default function RoomPlannerPro() {
   const [store, setStore] = usePersistentState();
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
+  const [activeHotelFilter, setActiveHotelFilter] = useState("all");
   const [dragData, setDragData] = useState<DragData | null>(null);
   const [message, setMessage] = useState<string>("");
   const [newRoomName, setNewRoomName] = useState("");
   const [newRoomBeds, setNewRoomBeds] = useState("2");
-  const [newRoomGender, setNewRoomGender] = useState("auto");
+  const [newRoomGender, setNewRoomGender] = useState<RoomGenderType>("auto");
+  const [newRoomHotelId, setNewRoomHotelId] = useState(
+    defaultHotels[0]?.id || "",
+  );
+  const [newHotelName, setNewHotelName] = useState("");
   const [form, setForm] = useState<AddPersonForm>({
     name: "",
     type: "adult",
@@ -619,6 +712,7 @@ export default function RoomPlannerPro() {
   const peopleFileRef = useRef<HTMLInputElement | null>(null);
   const roomsFileRef = useRef<HTMLInputElement | null>(null);
 
+  const hotels = store.hotels;
   const people = store.people;
   const rooms = store.rooms;
   const settings = store.settings;
@@ -649,6 +743,12 @@ export default function RoomPlannerPro() {
     });
   }, [unassignedPeople, search, activeFilter]);
 
+  const visibleRooms = useMemo(() => {
+    return activeHotelFilter === "all"
+      ? rooms
+      : rooms.filter((room) => room.hotelId === activeHotelFilter);
+  }, [rooms, activeHotelFilter]);
+
   const totals = useMemo(() => {
     const totalBeds = rooms.reduce((sum, room) => sum + room.beds.length, 0);
     const usedBeds = rooms.reduce(
@@ -660,15 +760,17 @@ export default function RoomPlannerPro() {
     return {
       people: people.length,
       adults: people.filter((p) => p.type === "adult").length,
+      students: people.filter((p) => p.type === "student").length,
       children: people.filter((p) => p.type === "child").length,
       infants: people.filter((p) => p.type === "infant").length,
       familyCount: new Set(people.map((p) => p.family).filter(Boolean)).size,
+      hotelCount: hotels.length,
       totalBeds,
       usedBeds,
       bedNeed,
       roomCount: rooms.length,
     };
-  }, [people, rooms]);
+  }, [people, rooms, hotels]);
 
   function patchStore(next: Partial<StoreState>): void {
     setStore((prev) => ({
@@ -676,6 +778,10 @@ export default function RoomPlannerPro() {
       ...next,
       lastSyncedAt: new Date().toLocaleString("zh-TW"),
     }));
+  }
+
+  function setHotels(nextHotels: Hotel[]): void {
+    patchStore({ hotels: nextHotels });
   }
 
   function setRooms(nextRooms: Room[]): void {
@@ -697,7 +803,7 @@ export default function RoomPlannerPro() {
   function assignToRoom(personId: string, roomId: string): void {
     const person = personById(people, personId);
     if (!person) return;
-    let next = clearPersonFromRooms(rooms, personId).map((room) => {
+    const next = clearPersonFromRooms(rooms, personId).map((room) => {
       if (room.id !== roomId) return room;
       const merged = {
         ...room,
@@ -751,9 +857,19 @@ export default function RoomPlannerPro() {
     });
   }
 
+  function addHotel(): void {
+    if (!newHotelName.trim()) return;
+    const hotel: Hotel = { id: uid("H"), name: newHotelName.trim(), note: "" };
+    setHotels([...hotels, hotel]);
+    setNewHotelName("");
+    setNewRoomHotelId(hotel.id);
+    setMessage(`已新增飯店：${hotel.name}`);
+  }
+
   function addRoom(): void {
     if (!newRoomName.trim() || Number(newRoomBeds) < 1) return;
     const room = buildRoom(uid("R"), newRoomName.trim(), Number(newRoomBeds));
+    room.hotelId = newRoomHotelId || hotels[0]?.id || "";
     room.lockGender = newRoomGender;
     setRooms([...rooms, room]);
     setNewRoomName("");
@@ -765,7 +881,10 @@ export default function RoomPlannerPro() {
     const data = await file.arrayBuffer();
     const wb = XLSX.read(data);
     const firstSheet = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(firstSheet, { defval: "" });
+    const rows = XLSX.utils.sheet_to_json(firstSheet, { defval: "" }) as Record<
+      string,
+      unknown
+    >[];
     if (mode === "people") {
       const parsed = parsePeopleSheet(rows);
       if (!parsed.length) {
@@ -778,9 +897,11 @@ export default function RoomPlannerPro() {
       setMessage(`已匯入 ${parsed.length} 筆人員資料`);
     }
     if (mode === "rooms") {
-      const parsed = parseRoomsSheet(rows);
+      const parsed = parseRoomsSheet(rows, hotels);
       if (!parsed.length) {
-        setMessage("找不到可匯入的房間資料，請確認欄位：房間名稱、床位數");
+        setMessage(
+          "找不到可匯入的房間資料，請確認欄位：飯店名稱、房間名稱、床位數",
+        );
         return;
       }
       setRooms(parsed);
@@ -790,10 +911,11 @@ export default function RoomPlannerPro() {
 
   function exportExcel(): void {
     const wb = XLSX.utils.book_new();
-    const sheet1 = XLSX.utils.json_to_sheet(exportRows(people, rooms));
+    const sheet1 = XLSX.utils.json_to_sheet(exportRows(people, rooms, hotels));
     const roomSummary: RoomSummaryRow[] = rooms.map((room) => {
-      const stats = roomStats(room, people);
+      const stats = roomStats(room, people, hotels);
       return {
+        飯店: stats.hotelName,
         房間: room.name,
         房內人數: stats.members.length,
         需床位人數: stats.needBeds,
@@ -810,14 +932,14 @@ export default function RoomPlannerPro() {
 
   function exportPdf(): void {
     const doc = new jsPDF({ unit: "pt", format: "a4" });
-    const rows = exportRows(people, rooms);
+    const rows = exportRows(people, rooms, hotels);
     let y = 40;
     doc.setFontSize(16);
     doc.text("Room Assignment Report", 40, y);
     y += 24;
     doc.setFontSize(10);
     rows.forEach((row, idx) => {
-      const line = `${idx + 1}. ${row["姓名"]} / ${row["身分"]} / ${row["家庭群組"] || "-"} / ${row["房間"]} / ${row["床位"]}`;
+      const line = `${idx + 1}. ${row["姓名"]} / ${row["身分"]} / ${row["家庭群組"] || "-"} / ${row["飯店"]} / ${row["房間"]} / ${row["床位"]}`;
       if (y > 780) {
         doc.addPage();
         y = 40;
@@ -829,7 +951,7 @@ export default function RoomPlannerPro() {
   }
 
   function autoAssign(): void {
-    const result = autoAssignPeople(people, rooms, settings);
+    const result = autoAssignPeople(people, rooms, hotels, settings);
     setRooms(result.rooms);
     setMessage(
       result.overflow.length
@@ -845,6 +967,7 @@ export default function RoomPlannerPro() {
 
   function resetDemo(): void {
     patchStore({
+      hotels: defaultHotels,
       people: defaultPeople,
       rooms: defaultRooms,
       settings: {
@@ -853,11 +976,16 @@ export default function RoomPlannerPro() {
         autoSave: true,
       },
     });
+    setNewRoomHotelId(defaultHotels[0]?.id || "");
     setMessage("已重設成示範資料");
   }
 
   function downloadTemplates(): void {
     const wb = XLSX.utils.book_new();
+    const hotelTpl = XLSX.utils.json_to_sheet([
+      { 飯店名稱: "和平飯店", 備註: "主館" },
+      { 飯店名稱: "恩典旅店", 備註: "分館" },
+    ]);
     const peopleTpl = XLSX.utils.json_to_sheet([
       {
         姓名: "王大明",
@@ -882,17 +1010,33 @@ export default function RoomPlannerPro() {
       },
     ]);
     const roomTpl = XLSX.utils.json_to_sheet([
-      { 房間名稱: "101房", 床位數: 2, 房間性別: "auto", 樓層: 1, 備註: "" },
-      { 房間名稱: "102房", 床位數: 4, 房間性別: "auto", 樓層: 1, 備註: "" },
+      {
+        飯店名稱: "和平飯店",
+        房間名稱: "101房",
+        床位數: 2,
+        房間性別: "auto",
+        樓層: 1,
+        備註: "",
+      },
+      {
+        飯店名稱: "恩典旅店",
+        房間名稱: "102房",
+        床位數: 4,
+        房間性別: "auto",
+        樓層: 1,
+        備註: "",
+      },
     ]);
+    XLSX.utils.book_append_sheet(wb, hotelTpl, "飯店範本");
     XLSX.utils.book_append_sheet(wb, peopleTpl, "人員範本");
     XLSX.utils.book_append_sheet(wb, roomTpl, "房間範本");
     XLSX.writeFile(wb, "排房匯入範本.xlsx");
   }
 
   const roomWarnings = rooms.flatMap((room) => {
-    const stats = roomStats(room, people);
-    if (stats.extra > 0) return [`${room.name} 超出 ${stats.extra} 床`];
+    const stats = roomStats(room, people, hotels);
+    if (stats.extra > 0)
+      return [`${stats.hotelName} / ${room.name} 超出 ${stats.extra} 床`];
     return [];
   });
 
@@ -905,8 +1049,9 @@ export default function RoomPlannerPro() {
               排房間床位系統 Pro
             </h1>
             <p className="text-sm text-slate-600 mt-1">
-              Excel / CSV 匯入、自動分房、家庭優先、男女分房、Excel / PDF
-              匯出、本機資料保存、手機可用。
+              支援多飯店區分、不同顏色標示、Excel / CSV
+              匯入、自動分房、家庭優先、男女分房、Excel / PDF
+              匯出、本機資料保存。
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -951,12 +1096,18 @@ export default function RoomPlannerPro() {
           </Alert>
         )}
 
-        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
           <StatCard
             title="總名單"
             value={totals.people}
-            sub={`${totals.adults}成人 / ${totals.children}孩童 / ${totals.infants}幼兒`}
+            sub={`${totals.adults}成人 / ${totals.students}學生 / ${totals.children}孩童 / ${totals.infants}幼兒`}
             icon={Users}
+          />
+          <StatCard
+            title="飯店數"
+            value={totals.hotelCount}
+            sub="可區分不同飯店"
+            icon={HotelIcon}
           />
           <StatCard
             title="家庭數"
@@ -979,7 +1130,7 @@ export default function RoomPlannerPro() {
           <StatCard
             title="需床位"
             value={totals.bedNeed}
-            sub="只計成人"
+            sub="成人 + 學生"
             icon={UserRound}
           />
           <StatCard
@@ -994,12 +1145,6 @@ export default function RoomPlannerPro() {
             sub="孩童 + 幼兒"
             icon={Baby}
           />
-          <StatCard
-            title="同步狀態"
-            value={store.lastSyncedAt ? "已保存" : "未保存"}
-            sub={store.lastSyncedAt || "尚未寫入"}
-            icon={Database}
-          />
         </div>
 
         <Tabs defaultValue="planner" className="space-y-4">
@@ -1011,6 +1156,22 @@ export default function RoomPlannerPro() {
 
           <TabsContent value="planner" className="space-y-4">
             <div className="flex flex-wrap gap-2">
+              <Select
+                value={activeHotelFilter}
+                onValueChange={setActiveHotelFilter}
+              >
+                <SelectTrigger className="w-[220px] rounded-2xl bg-white">
+                  <SelectValue placeholder="選擇飯店" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">全部飯店</SelectItem>
+                  {hotels.map((hotel) => (
+                    <SelectItem key={hotel.id} value={hotel.id}>
+                      {hotel.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Button className="rounded-2xl" onClick={autoAssign}>
                 <Wand2 className="mr-2 h-4 w-4" />
                 一鍵自動分房
@@ -1100,12 +1261,13 @@ export default function RoomPlannerPro() {
               </Card>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-4">
-                {rooms.map((room) => {
-                  const stats = roomStats(room, people);
+                {visibleRooms.map((room) => {
+                  const stats = roomStats(room, people, hotels);
+                  const hotelStyle = getHotelStyle(hotels, room.hotelId);
                   return (
                     <motion.div key={room.id} layout>
                       <Card
-                        className={`rounded-2xl shadow-sm border-2 ${stats.extra ? "border-red-300" : "border-transparent"}`}
+                        className={`rounded-2xl shadow-sm border-2 ${stats.extra ? "border-red-300" : hotelStyle.card}`}
                         onDragOver={(e) => e.preventDefault()}
                         onDrop={(e) => {
                           e.preventDefault();
@@ -1114,13 +1276,24 @@ export default function RoomPlannerPro() {
                           setDragData(null);
                         }}
                       >
-                        <CardHeader className="pb-3">
+                        <CardHeader className="pb-3 relative overflow-hidden">
+                          <div
+                            className={`absolute inset-x-0 top-0 h-1 ${hotelStyle.accent}`}
+                          />
                           <div className="flex items-start justify-between gap-3">
                             <div>
-                              <CardTitle className="text-lg flex items-center gap-2">
-                                <Home className="h-5 w-5" />
-                                {room.name}
-                              </CardTitle>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <CardTitle className="text-lg flex items-center gap-2">
+                                  <Home className="h-5 w-5" />
+                                  {room.name}
+                                </CardTitle>
+                                <Badge
+                                  variant="outline"
+                                  className={hotelStyle.badge}
+                                >
+                                  {stats.hotelName}
+                                </Badge>
+                              </div>
                               <p className="text-sm text-slate-600 mt-1">
                                 {stats.members.length} 人 / 需床位{" "}
                                 {stats.needBeds} / 床位 {stats.totalBeds}
@@ -1171,14 +1344,14 @@ export default function RoomPlannerPro() {
                                         );
                                       setDragData(null);
                                     }}
-                                    className="rounded-2xl border bg-white p-3 min-h-[92px]"
+                                    className={`rounded-2xl border p-3 min-h-[92px] ${hotelStyle.bed}`}
                                   >
                                     <div className="text-sm font-medium flex items-center gap-2">
                                       <BedDouble className="h-4 w-4" />
                                       {bed.label}
                                     </div>
                                     {occupant ? (
-                                      <div className="mt-3 rounded-xl bg-slate-50 p-2">
+                                      <div className="mt-3 rounded-xl bg-white/80 p-2">
                                         <div className="text-sm font-medium truncate">
                                           {occupant.name}
                                         </div>
@@ -1197,7 +1370,7 @@ export default function RoomPlannerPro() {
                                       </div>
                                     ) : (
                                       <div className="mt-3 text-xs text-slate-400">
-                                        拖拉成人到這張床
+                                        拖拉成人或學生到這張床
                                       </div>
                                     )}
                                   </div>
@@ -1289,8 +1462,7 @@ export default function RoomPlannerPro() {
                     選擇人員檔案
                   </Button>
                   <div className="text-sm text-slate-600 leading-6">
-                    支援欄位：姓名、身分、家庭/群組、性別、備註。身分可填：成人、學生、孩童、幼兒。可直接匯入
-                    100+ 筆資料。
+                    支援欄位：姓名、身分、家庭/群組、性別、備註。身分可填：成人、學生、孩童、幼兒。
                   </div>
                 </CardContent>
               </Card>
@@ -1318,7 +1490,7 @@ export default function RoomPlannerPro() {
                     選擇房間檔案
                   </Button>
                   <div className="text-sm text-slate-600 leading-6">
-                    支援欄位：房間名稱、床位數、房間性別、樓層、備註。
+                    支援欄位：飯店名稱、房間名稱、床位數、房間性別、樓層、備註。
                   </div>
                 </CardContent>
               </Card>
@@ -1355,13 +1527,15 @@ export default function RoomPlannerPro() {
                 </CardHeader>
                 <CardContent className="space-y-3 text-sm leading-6 text-slate-700">
                   <div>
-                    目前這個單檔版已經有「本機資料保存」功能，關閉後再開仍可保留資料。
+                    目前這個單檔版已經有本機資料保存功能，關閉後再開仍可保留資料。
                   </div>
                   <div>
                     若要真正做到手機與電腦即時同步，需要接上雲端資料庫，例如
                     Supabase / Firebase / MySQL API。
                   </div>
-                  <div>這個前端結構已經整理好，後續可直接接雲端後端。</div>
+                  <div>
+                    現在已先把多飯店資料結構整理好，後續接後端會比較順。
+                  </div>
                 </CardContent>
               </Card>
             </div>
@@ -1392,7 +1566,7 @@ export default function RoomPlannerPro() {
                     <div>
                       <Label>男女分房</Label>
                       <div className="text-xs text-slate-500 mt-1">
-                        成人依性別優先分開，混合家庭需用 mixed / auto 房
+                        成人與學生依性別優先分開
                       </div>
                     </div>
                     <Switch
@@ -1419,9 +1593,42 @@ export default function RoomPlannerPro() {
 
               <Card className="rounded-2xl shadow-sm">
                 <CardHeader>
-                  <CardTitle>新增房間</CardTitle>
+                  <CardTitle>新增飯店與房間</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
+                  <div className="rounded-xl border p-3 space-y-3 bg-slate-50">
+                    <div className="text-sm font-medium">先新增飯店</div>
+                    <Input
+                      value={newHotelName}
+                      onChange={(e) => setNewHotelName(e.target.value)}
+                      placeholder="飯店名稱，例如 台北凱撒大飯店"
+                      className="rounded-xl"
+                    />
+                    <Button
+                      variant="outline"
+                      className="rounded-2xl w-full"
+                      onClick={addHotel}
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      新增飯店
+                    </Button>
+                  </div>
+                  <Separator />
+                  <Select
+                    value={newRoomHotelId}
+                    onValueChange={setNewRoomHotelId}
+                  >
+                    <SelectTrigger className="rounded-xl">
+                      <SelectValue placeholder="選擇飯店" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {hotels.map((hotel) => (
+                        <SelectItem key={hotel.id} value={hotel.id}>
+                          {hotel.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Input
                     value={newRoomName}
                     onChange={(e) => setNewRoomName(e.target.value)}
@@ -1437,7 +1644,9 @@ export default function RoomPlannerPro() {
                   />
                   <Select
                     value={newRoomGender}
-                    onValueChange={setNewRoomGender}
+                    onValueChange={(value) =>
+                      setNewRoomGender(value as RoomGenderType)
+                    }
                   >
                     <SelectTrigger className="rounded-xl">
                       <SelectValue placeholder="房間性別" />
@@ -1471,7 +1680,9 @@ export default function RoomPlannerPro() {
                   />
                   <Select
                     value={form.type}
-                    onValueChange={(v) => setForm({ ...form, type: v })}
+                    onValueChange={(v) =>
+                      setForm({ ...form, type: v as PersonType })
+                    }
                   >
                     <SelectTrigger className="rounded-xl">
                       <SelectValue />
@@ -1493,7 +1704,9 @@ export default function RoomPlannerPro() {
                   />
                   <Select
                     value={form.gender}
-                    onValueChange={(v) => setForm({ ...form, gender: v })}
+                    onValueChange={(v) =>
+                      setForm({ ...form, gender: v as GenderType })
+                    }
                   >
                     <SelectTrigger className="rounded-xl">
                       <SelectValue />
@@ -1526,6 +1739,14 @@ export default function RoomPlannerPro() {
                   <Button
                     variant="outline"
                     className="rounded-2xl w-full justify-start"
+                    onClick={() => setHotels([])}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    清空飯店資料
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="rounded-2xl w-full justify-start"
                     onClick={() => setPeople([])}
                   >
                     <Trash2 className="mr-2 h-4 w-4" />
@@ -1551,7 +1772,7 @@ export default function RoomPlannerPro() {
                     清除本機資料庫
                   </Button>
                   <div className="rounded-xl bg-slate-50 p-3 leading-6">
-                    這個版本已完成：匯入、拖拉、規則分房、匯出、本機儲存。真正跨裝置同步仍需外接雲端資料庫與帳號登入。
+                    現在已支援多飯店管理，不同飯店會用不同顏色區隔。真正跨裝置同步仍需外接雲端資料庫與帳號登入。
                   </div>
                 </CardContent>
               </Card>
