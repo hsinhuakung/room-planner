@@ -447,8 +447,8 @@ function fillBedsSequentially(room: Room, people: Person[]): Room {
     .filter(
       (p): p is Person =>
         Boolean(p) &&
-        TYPE_META[p.type]?.needsBed &&
-        !currentlyAssigned.has(p.id),
+        TYPE_META[p!.type]?.needsBed &&
+        !currentlyAssigned.has(p!.id),
     );
 
   room.beds.forEach((bed) => {
@@ -600,11 +600,15 @@ function autoAssignPeople(
   hotels: Hotel[],
   options: Settings,
 ): { rooms: Room[]; overflow: string[] } {
-  const cleanRooms = rooms.map((room) => ({
-    ...room,
-    members: [],
-    bedAssignments: Object.fromEntries(room.beds.map((b) => [b.id, null])),
-  }));
+  const cleanRooms: Room[] = rooms.map(
+    (room): Room => ({
+      ...room,
+      members: [] as string[],
+      bedAssignments: Object.fromEntries(
+        room.beds.map((b): [string, string | null] => [b.id, null]),
+      ),
+    }),
+  );
 
   const groups = groupPeopleForAutoAssign(people).sort((a, b) => {
     if (b.bedNeed !== a.bedNeed) return b.bedNeed - a.bedNeed;
