@@ -41,6 +41,7 @@ import {
   Filter,
   CheckCircle2,
   Hotel as HotelIcon,
+  List,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
@@ -100,10 +101,13 @@ const TYPE_META = {
 } as const;
 
 const GENDER_META = {
-  male: { label: "男" },
-  female: { label: "女" },
-  other: { label: "其他" },
-  unknown: { label: "未填" },
+  male: { label: "男", badge: "bg-blue-100 text-blue-800 border-blue-200" },
+  female: { label: "女", badge: "bg-pink-100 text-pink-800 border-pink-200" },
+  other: { label: "其他", badge: "bg-zinc-100 text-zinc-800 border-zinc-200" },
+  unknown: {
+    label: "未填",
+    badge: "bg-slate-100 text-slate-700 border-slate-200",
+  },
 } as const;
 
 type PersonType = keyof typeof TYPE_META;
@@ -199,6 +203,11 @@ type AddPersonForm = {
   family: string;
   gender: GenderType;
   note: string;
+};
+
+type PickerTarget = {
+  roomId: string;
+  bedId?: string;
 };
 
 type RoomStats = {
@@ -694,6 +703,7 @@ export default function RoomPlannerPro() {
   const [activeFilter, setActiveFilter] = useState("all");
   const [activeHotelFilter, setActiveHotelFilter] = useState("all");
   const [dragData, setDragData] = useState<DragData | null>(null);
+  const [pickerTarget, setPickerTarget] = useState<PickerTarget | null>(null);
   const [message, setMessage] = useState<string>("");
   const [newRoomName, setNewRoomName] = useState("");
   const [newRoomBeds, setNewRoomBeds] = useState("2");
@@ -833,6 +843,16 @@ export default function RoomPlannerPro() {
       );
     });
     setRooms(next);
+  }
+
+  function assignViaPicker(personId: string): void {
+    if (!pickerTarget) return;
+    if (pickerTarget.bedId) {
+      assignToBed(personId, pickerTarget.roomId, pickerTarget.bedId);
+    } else {
+      assignToRoom(personId, pickerTarget.roomId);
+    }
+    setPickerTarget(null);
   }
 
   function addPerson(): void {
@@ -1096,6 +1116,71 @@ export default function RoomPlannerPro() {
           </Alert>
         )}
 
+        {pickerTarget && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl border">
+              <div className="flex items-center justify-between border-b px-4 py-3">
+                <div>
+                  <div className="font-semibold">選擇未安排人員</div>
+                  <div className="text-xs text-slate-500 mt-1">
+                    可直接加入房間，或指定到床位，適合手機操作
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="rounded-lg"
+                  onClick={() => setPickerTarget(null)}
+                >
+                  關閉
+                </Button>
+              </div>
+              <div className="p-4">
+                <ScrollArea className="h-[50vh] pr-3">
+                  <div className="space-y-2">
+                    {filteredUnassigned.map((person) => (
+                      <button
+                        key={person.id}
+                        type="button"
+                        className="w-full rounded-xl border bg-white p-3 text-left hover:bg-slate-50"
+                        onClick={() => assignViaPicker(person.id)}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="font-medium">{person.name}</div>
+                            <div className="text-xs text-slate-500 mt-1">
+                              {person.id}{" "}
+                              {!!person.family && `· ${person.family}`}{" "}
+                              {!!person.note && `· ${person.note}`}
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-end gap-1">
+                            <Badge className={TYPE_META[person.type].badge}>
+                              {TYPE_META[person.type].label}
+                            </Badge>
+                            <Badge
+                              variant="outline"
+                              className={GENDER_META[person.gender].badge}
+                            >
+                              {GENDER_META[person.gender].label}
+                            </Badge>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                    {!filteredUnassigned.length && (
+                      <div className="rounded-xl border border-dashed p-6 text-center text-sm text-slate-500">
+                        目前沒有可加入的未安排人員
+                      </div>
+                    )}
+                  </div>
+                </ScrollArea>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
           <StatCard
             title="總名單"
@@ -1346,9 +1431,26 @@ export default function RoomPlannerPro() {
                                     }}
                                     className={`rounded-2xl border p-3 min-h-[92px] ${hotelStyle.bed}`}
                                   >
-                                    <div className="text-sm font-medium flex items-center gap-2">
-                                      <BedDouble className="h-4 w-4" />
-                                      {bed.label}
+                                    <div className="flex items-center justify-between gap-2">
+                                      <div className="text-sm font-medium flex items-center gap-2">
+                                        <BedDouble className="h-4 w-4" />
+                                        {bed.label}
+                                      </div>
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-7 rounded-lg px-2 text-xs"
+                                        onClick={() =>
+                                          setPickerTarget({
+                                            roomId: room.id,
+                                            bedId: bed.id,
+                                          })
+                                        }
+                                      >
+                                        <List className="mr-1 h-3.5 w-3.5" />
+                                        選人
+                                      </Button>
                                     </div>
                                     {occupant ? (
                                       <div className="mt-3 rounded-xl bg-white/80 p-2">
@@ -1363,14 +1465,19 @@ export default function RoomPlannerPro() {
                                           >
                                             {TYPE_META[occupant.type].label}
                                           </Badge>
-                                          <Badge variant="outline">
+                                          <Badge
+                                            variant="outline"
+                                            className={
+                                              GENDER_META[occupant.gender].badge
+                                            }
+                                          >
                                             {GENDER_META[occupant.gender].label}
                                           </Badge>
                                         </div>
                                       </div>
                                     ) : (
                                       <div className="mt-3 text-xs text-slate-400">
-                                        拖拉成人或學生到這張床
+                                        拖拉成人或學生到這張床，或用選人按鈕
                                       </div>
                                     )}
                                   </div>
@@ -1380,8 +1487,22 @@ export default function RoomPlannerPro() {
                           </div>
                           <Separator />
                           <div>
-                            <div className="text-sm font-medium mb-2">
-                              房內成員
+                            <div className="flex items-center justify-between gap-2 mb-2">
+                              <div className="text-sm font-medium">
+                                房內成員
+                              </div>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-8 rounded-lg px-2 text-xs"
+                                onClick={() =>
+                                  setPickerTarget({ roomId: room.id })
+                                }
+                              >
+                                <List className="mr-1 h-3.5 w-3.5" />
+                                從名單加入
+                              </Button>
                             </div>
                             <div className="flex flex-wrap gap-2">
                               {stats.members.map((person) => {
@@ -1401,6 +1522,14 @@ export default function RoomPlannerPro() {
                                       className={TYPE_META[person.type].badge}
                                     >
                                       {TYPE_META[person.type].label}
+                                    </Badge>
+                                    <Badge
+                                      variant="outline"
+                                      className={
+                                        GENDER_META[person.gender].badge
+                                      }
+                                    >
+                                      {GENDER_META[person.gender].label}
                                     </Badge>
                                     {!!person.family && (
                                       <Badge variant="outline">
@@ -1423,7 +1552,7 @@ export default function RoomPlannerPro() {
                               })}
                               {!stats.members.length && (
                                 <div className="text-sm text-slate-400">
-                                  拖拉人員到此房間
+                                  拖拉人員到此房間，或按上方按鈕選人
                                 </div>
                               )}
                             </div>
@@ -1772,7 +1901,7 @@ export default function RoomPlannerPro() {
                     清除本機資料庫
                   </Button>
                   <div className="rounded-xl bg-slate-50 p-3 leading-6">
-                    現在已支援多飯店管理，不同飯店會用不同顏色區隔。真正跨裝置同步仍需外接雲端資料庫與帳號登入。
+                    現在已支援多飯店管理，不同飯店會用不同顏色區隔，也可直接從房間按鈕開啟未安排名單，方便手機使用。
                   </div>
                 </CardContent>
               </Card>
@@ -1844,7 +1973,9 @@ function PersonCard({
           <Badge className={TYPE_META[person.type].badge}>
             {TYPE_META[person.type].label}
           </Badge>
-          <Badge variant="outline">{GENDER_META[person.gender].label}</Badge>
+          <Badge variant="outline" className={GENDER_META[person.gender].badge}>
+            {GENDER_META[person.gender].label}
+          </Badge>
         </div>
       </div>
     </div>
